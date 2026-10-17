@@ -99,7 +99,4 @@ the real backend:
 
 
 
-To work on this repo in [Google Antigravity](https://antigravity.google):
-clone it from GitHub (or unzip `bioagent-frontend-src.zip` and open the
-folder), then run the setup commands from **Getting started** in the
-integrated terminal before handing tasks to the agents.
+
