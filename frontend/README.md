@@ -97,13 +97,7 @@ the real backend:
 5. **Deploy** — the frontend deploys cleanly to Vercel/Netlify; run BioAgent-ST on
    its own host and set the env var in the deploy dashboard.
 
-## Developing with agentic IDEs (Google Antigravity, Gemini CLI, etc.)
 
-This repo ships an [`AGENTS.md`](./AGENTS.md) file at the root — the open
-standard for guiding coding agents. Tools like Google Antigravity
-auto-discover it and inject the project context (stack, commands, domain
-model, backend integration plan, guardrails) into every agent session, so
-agent-driven work on this codebase starts with the correct context.
 
 To work on this repo in [Google Antigravity](https://antigravity.google):
 clone it from GitHub (or unzip `bioagent-frontend-src.zip` and open the
