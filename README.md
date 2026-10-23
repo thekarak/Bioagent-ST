@@ -20,7 +20,7 @@ BioAgent-ST/
 The web frontend provides the research-workspace UI, interactive spatial visualization, evaluation protocol dashboard, evidence ledger, and claim classification interface.
 
 - See [frontend/README.md](frontend/README.md) for architecture, tech stack, and local development instructions.
-- See [frontend/AGENTS.md](frontend/AGENTS.md) for coding agent guidelines.
+
 
 ---
 
