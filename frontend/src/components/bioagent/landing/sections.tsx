@@ -1,8 +1,19 @@
 "use client";
 
-/** Landing page sections: nav, pipeline strip, workflow cards, evidence, limitations, footer. */
+/**
+ * Landing page sections, part 1 — minimal editorial style: fixed navigation,
+ * hairline stat band, the scroll-lit pipeline, restrained workflow cards and
+ * the evidence section with its interactive five-state legend.
+ */
 
 import * as React from "react";
+import {
+  motion,
+  useScroll,
+  useSpring,
+  useMotionValueEvent,
+  AnimatePresence,
+} from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   Inbox,
@@ -14,17 +25,6 @@ import {
   ScrollText,
   FileText,
   ArrowRight,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  BookOpen,
-  Github,
-  ExternalLink,
-  FlaskConical,
-  CircleDot,
-  CircleDashed,
-  Bot,
-  Lock,
 } from "lucide-react";
 import { Wordmark } from "@/components/bioagent/common/Wordmark";
 import { navigateTo, APP_ROUTES } from "@/lib/bioagent/router";
@@ -32,136 +32,290 @@ import { useBioAgentStore } from "@/lib/bioagent/store";
 import { WORKFLOWS, WORKFLOW_ORDER } from "@/lib/bioagent/workflows";
 import type { WorkflowId } from "@/lib/bioagent/types";
 import { cn } from "@/lib/utils";
+import { useScrollSpy, useReveal, useCountUp } from "./motion";
+import { TiltCard } from "./tilt";
+import { Section, SectionHeader, NAV_LINKS, staggerContainer, riseItem } from "./section-kit";
+import { ThemeToggle } from "./theme";
 
 /* ---------- Navigation ---------- */
 
-const NAV_LINKS = [
-  { label: "Overview", href: "#top" },
-  { label: "Workflows", href: "#workflows" },
-  { label: "Research Approach", href: "#evidence" },
-  { label: "Research Context", href: "#research-context" },
-  { label: "Documentation", href: "#documentation" },
-];
+const SCROLL_SPY_SECTIONS = ["hero", "workflows", "evidence", "research-context", "documentation"] as const;
 
 export function LandingNav() {
   const [scrolled, setScrolled] = React.useState(false);
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.4 });
+  const active = useScrollSpy(SCROLL_SPY_SECTIONS, "hero");
+
   React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-40 border-b bg-card/90 backdrop-blur",
-        scrolled ? "border-border shadow-[0_1px_2px_rgba(25,42,50,0.04)]" : "border-transparent"
-      )}
-    >
+    <header className="ba-nav fixed inset-x-0 top-0 z-40" data-scrolled={scrolled}>
+      {/* reading progress (spring-smoothed) */}
+      <div aria-hidden className="absolute inset-x-0 top-0 h-[2px] overflow-hidden">
+        <motion.div style={{ scaleX }} className="h-full origin-left bg-[var(--ba-ink)]" />
+      </div>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <a href="#top" className="ba-focus rounded" aria-label="BioAgent-ST home">
-          <Wordmark />
+        <a href="#top" className="ba-focus rounded-md" aria-label="BioAgent-ST home">
+          <Wordmark neutral />
         </a>
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Landing sections">
-          {NAV_LINKS.map((l) => (
-            <a
-              key={l.label}
-              href={l.href}
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              {l.label}
-            </a>
-          ))}
+        <nav className="hidden items-center gap-6 md:flex" aria-label="Landing sections">
+          {NAV_LINKS.map((l) => {
+            const id = l.href === "#top" ? "hero" : l.href.slice(1);
+            const isActive = active === id;
+            return (
+              <a
+                key={l.label}
+                href={l.href}
+                aria-current={isActive ? "true" : undefined}
+                className={cn(
+                  "ba-focus relative rounded-md py-1 text-[13px] transition-colors",
+                  isActive ? "text-[var(--ba-ink)]" : "text-[var(--ba-muted)] hover:text-[var(--ba-ink)]",
+                )}
+              >
+                {l.label}
+                {isActive && (
+                  <motion.span
+                    layoutId="ba-nav-underline"
+                    transition={{ type: "spring", stiffness: 380, damping: 34 }}
+                    className="absolute inset-x-0 -bottom-0.5 h-px bg-[var(--ba-ink)]"
+                    aria-hidden
+                  />
+                )}
+              </a>
+            );
+          })}
         </nav>
-        <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => navigateTo(APP_ROUTES.overview)}>
-          Open Workspace
-          <ArrowRight className="size-3.5" aria-hidden />
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button
+            size="sm"
+            className="bg-[var(--ba-ink)] text-[var(--ba-bg)] transition-colors hover:bg-[var(--ba-ink-hover)]"
+            onClick={() => navigateTo(APP_ROUTES.overview)}
+          >
+            Open workspace
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Button>
+        </div>
       </div>
     </header>
   );
 }
 
-/* ---------- Pipeline strip ---------- */
+/* ---------- Stat band ---------- */
 
-const PIPELINE_STAGES = [
-  { n: 1, label: "Request", icon: Inbox },
-  { n: 2, label: "Validate", icon: ScanSearch },
-  { n: 3, label: "Select", icon: Route },
-  { n: 4, label: "Policy Gate", icon: ShieldCheck },
-  { n: 5, label: "Execute", icon: Cog },
-  { n: 6, label: "Verify", icon: ClipboardCheck },
-  { n: 7, label: "Record Evidence", icon: ScrollText },
-  { n: 8, label: "Report", icon: FileText },
-];
+const STATS = [
+  { value: 3, label: "Approved workflows" },
+  { value: 4, label: "Typed routing outcomes" },
+  { value: 8, label: "Pipeline stages" },
+  { value: 5, label: "Evidence states" },
+] as const;
 
-export function PipelineStrip() {
+function StatItem({
+  value,
+  label,
+  delay,
+}: {
+  value: number;
+  label: string;
+  delay: number;
+}) {
+  const [ref, visible] = useReveal<HTMLDivElement>();
+  const count = useCountUp(value, visible);
   return (
-    <section id="workflows" className="border-t border-border bg-card py-12" aria-labelledby="pipeline-title">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Analysis pipeline
-        </p>
-        <h2 id="pipeline-title" className="mt-1 text-xl font-semibold tracking-tight">
-          Eight stages, two boundaries
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          A research question moves through validation, workflow selection and a policy decision
-          before any scientific code runs. Execution, verification and evidence recording follow —
-          workflow selection and scientific execution are separate operations.
-        </p>
+    <div
+      ref={ref}
+      data-visible={visible ? "true" : "false"}
+      style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}
+      className="ba-reveal px-2 py-8 text-center md:py-10"
+    >
+      <p className="text-3xl font-semibold tabular-nums tracking-tight text-[var(--ba-ink)] sm:text-4xl">
+        {count}
+      </p>
+      <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ba-muted)]">
+        {label}
+      </p>
+    </div>
+  );
+}
 
-        <div className="mt-7 overflow-x-auto pb-2">
-          <ol className="flex min-w-max items-stretch gap-0" aria-label="Pipeline stages">
-            {PIPELINE_STAGES.map((s, i) => (
-              <React.Fragment key={s.n}>
-                <li className="flex w-28 shrink-0 flex-col items-center gap-2 text-center">
-                  <span
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-md border",
-                      i >= 3 && i <= 4 ? "border-teal/40 bg-teal/10 text-teal" : "border-border bg-secondary text-primary"
-                    )}
-                    aria-hidden
-                  >
-                    <s.icon className="size-4" />
-                  </span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{String(s.n).padStart(2, "0")}</span>
-                  <span className="text-xs font-medium leading-tight text-foreground">{s.label}</span>
-                </li>
-                {i < PIPELINE_STAGES.length - 1 && (
-                  <li
-                    className={cn("flex items-center", i === 3 ? "px-1" : "px-1")}
-                    aria-hidden
-                  >
-                    {i === 3 ? (
-                      <span className="mx-1 h-8 w-px border-l border-dashed border-warning/60" title="Decision boundary" />
-                    ) : null}
-                    <span className="h-px w-4 bg-border" />
-                  </li>
-                )}
-              </React.Fragment>
-            ))}
-          </ol>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-3 w-px border-l border-dashed border-warning/70" aria-hidden />
-            Stages 1–4: request handling and policy decision (AI-assisted selection, no arbitrary code)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-[2px] bg-teal/30" aria-hidden />
-            Stages 4–8: registered scientific execution and evidence recording
-          </span>
-        </div>
+export function StatBand() {
+  return (
+    <section aria-label="System highlights" className="ba-glass border-y border-[var(--ba-border)]">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 divide-x divide-[var(--ba-border)] px-4 sm:px-6 md:grid-cols-4">
+        {STATS.map((s, i) => (
+          <StatItem key={s.label} value={s.value} label={s.label} delay={i * 80} />
+        ))}
       </div>
     </section>
+  );
+}
+
+/* ---------- Pipeline: scroll-lit stage strip ---------- */
+
+const PIPELINE_STAGES = [
+  { n: 1, label: "Request", icon: Inbox, detail: "A natural-language research question and a dataset reference enter the pipeline." },
+  { n: 2, label: "Validate", icon: ScanSearch, detail: "The dataset is checked before anything runs: dimensions, identifiers, spatial coordinates and which metrics are available. Unavailable metrics stay unavailable." },
+  { n: 3, label: "Select", icon: Route, detail: "The typed selector maps the request onto the registered workflow set — three workflows plus explicit abstention. No arbitrary code is generated." },
+  { n: 4, label: "Policy gate", icon: ShieldCheck, detail: "An explicit ALLOW, REVIEW or BLOCK decision is recorded with its reason before any scientific code runs. This is the boundary between assistance and execution." },
+  { n: 5, label: "Execute", icon: Cog, detail: "The registered, deterministic workflow performs the computation with recorded configuration and seed." },
+  { n: 6, label: "Verify", icon: ClipboardCheck, detail: "Expected artifacts, label alignment, finite numerics and readable outputs are checked against what the workflow actually produced." },
+  { n: 7, label: "Record evidence", icon: ScrollText, detail: "Every input, decision and artifact is written to the provenance ledger, so the run can be inspected and replayed later." },
+  { n: 8, label: "Report", icon: FileText, detail: "Findings are assembled into a reproducible report in which every claim carries one of five evidence states." },
+] as const;
+
+export function PipelineStrip() {
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const { scrollYProgress } = useScroll({
+    target: stageRef,
+    offset: ["start 0.85", "end 0.5"],
+  });
+  const smooth = useSpring(scrollYProgress, { stiffness: 90, damping: 24 });
+  const [litCount, setLitCount] = React.useState(0);
+  const [focused, setFocused] = React.useState<number | null>(null);
+
+  useMotionValueEvent(smooth, "change", (v) => {
+    setLitCount(Math.max(0, Math.min(PIPELINE_STAGES.length, Math.round(v * PIPELINE_STAGES.length))));
+  });
+
+  const focusedStage = focused !== null ? PIPELINE_STAGES[focused] : null;
+
+  return (
+    <Section id="workflows" className="py-20 sm:py-24">
+      <SectionHeader
+        eyebrow="02 · Analysis pipeline"
+        title="Eight stages, two boundaries"
+        lead={
+          <p>
+            A research question moves through validation, workflow selection and a policy
+            decision before any scientific code runs. Execution, verification and evidence
+            recording follow — selection and execution are separate operations.{" "}
+            <span className="text-[var(--ba-ink)]">Scroll to trace a request through the stages.</span>
+          </p>
+        }
+      />
+
+      <div ref={stageRef} className="mt-12">
+        <div className="relative overflow-x-auto pb-2">
+          <div className="relative min-w-[640px] px-1 py-6">
+            {/* base track + progress fill */}
+            <div aria-hidden className="absolute inset-x-0 top-[43px] h-px bg-[var(--ba-border)]" />
+            <div
+              aria-hidden
+              className="ba-pipe-fill absolute left-0 top-[43px] h-px bg-[var(--ba-ink)]"
+              style={{ width: `${(litCount / PIPELINE_STAGES.length) * 100}%` }}
+            />
+            {/* decision boundary between selection (03) and execution (05) */}
+            <span
+              aria-hidden
+              className="absolute left-1/2 top-4 h-16 -translate-x-1/2 border-l border-dashed border-[var(--ba-warn-soft)]"
+            />
+            <span className="absolute left-1/2 top-[76px] -translate-x-1/2 whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.16em] text-[var(--ba-warn)]">
+              decision boundary
+            </span>
+
+            <ol className="relative flex items-start justify-between" aria-label="Pipeline stages">
+              {PIPELINE_STAGES.map((s, i) => {
+                const lit = i < litCount;
+                const isFocused = focused === i;
+                return (
+                  <li key={s.n} className="flex w-[72px] shrink-0 flex-col items-center">
+                    <button
+                      type="button"
+                      aria-pressed={isFocused}
+                      onClick={() => setFocused(isFocused ? null : i)}
+                      data-lit={lit ? "true" : "false"}
+                      data-current={lit && i === litCount - 1 ? "true" : "false"}
+                      className="ba-pipe-node ba-focus flex w-full flex-col items-center gap-1.5 rounded-lg p-1"
+                    >
+                      <span
+                        className={cn(
+                          "ba-pipe-circle relative flex size-11 items-center justify-center rounded-full border transition-colors",
+                          lit
+                            ? "border-[var(--ba-ink)] bg-[var(--ba-ink)] text-[var(--ba-bg)]"
+                            : "border-[var(--ba-border)] bg-[var(--ba-bg)] text-[var(--ba-faint)]",
+                          )}
+                        aria-hidden
+                      >
+                        <s.icon className="size-[18px]" />
+                      </span>
+                      <span className="font-mono text-[10px] text-[var(--ba-faint)]">
+                        {String(s.n).padStart(2, "0")}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium leading-tight transition-colors",
+                          lit ? "text-[var(--ba-ink)]" : "text-[var(--ba-muted)]",
+                        )}
+                      >
+                        {s.label}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+
+        {/* stage detail / hint */}
+        <div className="mt-6">
+          <AnimatePresence mode="wait" initial={false}>
+            {focusedStage ? (
+              <motion.div
+                key={`stage-${focusedStage.n}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                className="ba-glass-strong rounded-lg border border-[var(--ba-border)] p-5"
+              >
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ba-muted)]">
+                  Stage {String(focusedStage.n).padStart(2, "0")} —{" "}
+                  <span className="font-sans text-[12px] font-medium normal-case tracking-normal text-[var(--ba-ink)]">
+                    {focusedStage.label}
+                  </span>
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--ba-body)]">{focusedStage.detail}</p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="stage-hint"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-[var(--ba-muted)]"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-px border-l border-dashed border-[var(--ba-warn-soft)]" aria-hidden />
+                  Stages 1–4 — request handling and policy decision (AI-assisted selection, no arbitrary code)
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--ba-ink)]" aria-hidden />
+                  Stages 4–8 — registered scientific execution and evidence recording
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="font-mono">↳</span>
+                  Click any stage for details
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </Section>
   );
 }
 
 /* ---------- Workflow cards ---------- */
 
 const WORKFLOW_ICONS = { quality_assessment: ScanSearch, spatial_clustering: Route, gene_expression: Cog } as const;
-const WORKFLOW_ICON_COLORS = { quality_assessment: "text-teal", spatial_clustering: "text-primary", gene_expression: "text-verified" } as const;
 
 export function WorkflowCards() {
   const setPendingWorkflow = useBioAgentStore((s) => s.setPendingWorkflow);
@@ -170,577 +324,370 @@ export function WorkflowCards() {
     navigateTo(APP_ROUTES.newAnalysis);
   };
   return (
-    <section className="border-t border-border bg-background py-12" aria-labelledby="workflow-cards-title">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Approved workflows
-        </p>
-        <h2 id="workflow-cards-title" className="mt-1 text-xl font-semibold tracking-tight">
-          Three bounded scientific workflows
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          BioAgent-ST constrains analysis to a registered set. Unrestricted AI-generated code does not
-          execute scientific operations; requests either map to one of these workflows or are held for
-          review.
-        </p>
+    <section
+      id="approved-workflows"
+      aria-label="Approved workflows"
+      className="border-t border-[var(--ba-border)]"
+    >
+      <Section className="py-20 sm:py-24">
+        <SectionHeader
+          eyebrow="03 · Approved workflows"
+          title="Three bounded scientific workflows"
+          lead={
+            <p>
+              BioAgent-ST constrains analysis to a registered set. Unrestricted AI-generated code
+              does not execute scientific operations; requests either map to one of these
+              workflows or are held for review. Each card opens the workflow directly.
+            </p>
+          }
+        />
 
-        <div className="mt-7 grid gap-4 md:grid-cols-3">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-60px" }}
+          className="mt-10 grid items-stretch gap-4 md:grid-cols-3"
+        >
           {WORKFLOW_ORDER.map((id) => {
             const spec = WORKFLOWS[id];
             const Icon = WORKFLOW_ICONS[id];
             return (
-              <article key={id} className="flex flex-col rounded-lg border border-border bg-card p-5">
-                <span
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-md border border-border bg-secondary",
-                    WORKFLOW_ICON_COLORS[id]
-                  )}
-                  aria-hidden
-                >
-                  <Icon className="size-4.5" />
-                </span>
-                <h3 className="mt-3 text-sm font-semibold">{spec.title}</h3>
-                <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted-foreground">{spec.purpose}</p>
-                <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">Representative output: </span>
-                  {spec.representativeOutput}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full justify-between"
+              <motion.div key={id} variants={riseItem} className="h-full">
+                <TiltCard
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open the ${spec.title} workflow`}
                   onClick={() => openWorkflow(id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openWorkflow(id);
+                    }
+                  }}
+                  className="ba-glass ba-focus group relative flex h-full cursor-pointer flex-col rounded-lg border border-[var(--ba-border)] p-6 hover:border-[var(--ba-ink-soft)] hover:shadow-[0_2px_16px_var(--ba-shadow-c)]"
                 >
-                  Open workflow
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </Button>
-              </article>
+                  <div className="flex items-start justify-between">
+                    <span
+                      className="flex size-9 items-center justify-center rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] text-[var(--ba-ink)]"
+                      aria-hidden
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="font-mono text-[11px] text-[var(--ba-faint)]">
+                      Workflow {String(WORKFLOW_ORDER.indexOf(id) + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 text-[15px] font-semibold text-[var(--ba-ink)]">{spec.title}</h3>
+                  <p className="mt-1.5 flex-1 text-sm leading-relaxed text-[var(--ba-body)]">
+                    {spec.purpose}
+                  </p>
+                  <p className="mt-4 border-t border-[var(--ba-border)] pt-3 text-xs leading-relaxed text-[var(--ba-muted)]">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.12em]">
+                      Representative output
+                    </span>
+                    <br />
+                    {spec.representativeOutput}
+                  </p>
+                  <span className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--ba-ink)]">
+                    Open workflow
+                    <ArrowRight
+                      className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
+                  </span>
+                </TiltCard>
+              </motion.div>
             );
           })}
-        </div>
-      </div>
+        </motion.div>
+      </Section>
     </section>
   );
 }
 
-/* ---------- Evidence & reproducibility ---------- */
+/* ---------- Evidence & verification ---------- */
 
 function FragmentRow({
-  icon,
+  dot,
   label,
   value,
   mono = false,
 }: {
-  icon: React.ReactNode;
+  dot: string;
   label: string;
   value: string;
   mono?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 text-xs">
-      <span className="inline-flex min-w-0 items-center gap-1.5 text-muted-foreground">
-        {icon}
+      <span className="inline-flex min-w-0 items-center gap-2 text-[var(--ba-body)]">
+        <span
+          className="size-1.5 shrink-0 rounded-full"
+          style={{ background: dot }}
+          aria-hidden
+        />
         <span className="truncate">{label}</span>
       </span>
-      <span className={cn("shrink-0 text-foreground/90", mono && "font-mono text-[10px]")}>{value}</span>
+      <span className={cn("shrink-0 text-[var(--ba-ink)]", mono && "font-mono text-[11px]")}>{value}</span>
     </div>
   );
 }
 
+const GREEN = "var(--ba-ok)";
+const AMBER = "var(--ba-warn)";
+const GREY = "var(--ba-neutral)";
+const CYAN = "var(--ba-info)";
+
 export function EvidenceSection() {
   return (
-    <section id="evidence" className="border-t border-border bg-card py-12" aria-labelledby="evidence-title">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Research approach
-        </p>
-        <h2 id="evidence-title" className="mt-1 text-xl font-semibold tracking-tight">
-          Every run should leave an inspectable record.
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Each stage of the pipeline contributes evidence: what was asked, what was validated, which
-          workflow was selected, what the policy decided, and which artifacts were produced. The
-          interface below previews the four record types a researcher can audit after a run.
-        </p>
+    <section aria-label="Research approach" className="border-t border-[var(--ba-border)]">
+      <Section id="evidence" className="py-20 sm:py-24">
+        <SectionHeader
+          eyebrow="04 · Evidence & verification"
+          title="Every run should leave an inspectable record."
+          lead={
+            <p>
+              Each stage of the pipeline contributes evidence: what was asked, what was validated,
+              which workflow was selected, what the policy decided, and which artifacts were
+              produced. The records below preview the four types a researcher can audit after a
+              run.
+            </p>
+          }
+        />
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-60px" }}
+          className="mt-10 grid gap-4 sm:grid-cols-2"
+        >
           {/* 1. Input & schema validation */}
-          <article className="rounded-lg border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Input and schema validation</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
+          <motion.article
+            variants={riseItem}
+            className="h-full"
+          >
+            <TiltCard className="ba-glass relative h-full rounded-lg border border-[var(--ba-border)] p-5 hover:border-[var(--ba-ink-soft)]">
+            <h3 className="text-sm font-semibold text-[var(--ba-ink)]">Input and schema validation</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ba-muted)]">
               The dataset is checked before any workflow runs: dimensions, identifiers, coordinate
               availability. Unavailable metrics stay unavailable.
             </p>
-            <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card px-3">
-              <FragmentRow icon={<CheckCircle2 className="size-3.5 shrink-0 text-verified" aria-hidden />} label="obs × var" value="2,400 × 500" mono />
-              <FragmentRow icon={<CheckCircle2 className="size-3.5 shrink-0 text-verified" aria-hidden />} label="obsm['spatial']" value="present" />
-              <FragmentRow icon={<AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />} label="obs['mt_fraction']" value="not assessed" />
+            <div className="mt-3 divide-y divide-[var(--ba-divider)] rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] px-3">
+              <FragmentRow dot={GREEN} label="obs × var" value="2,400 × 500" mono />
+              <FragmentRow dot={GREEN} label="obsm['spatial']" value="present" />
+              <FragmentRow dot={AMBER} label="obs['mt_fraction']" value="not assessed" />
             </div>
-          </article>
+          </TiltCard>
+          </motion.article>
 
           {/* 2. Selection & policy */}
-          <article className="rounded-lg border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Approved workflow selection and policy decision</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              The selector maps the request to a registered workflow; the policy gate decides ALLOW,
-              REVIEW or BLOCK with an explicit reason before execution.
+          <motion.article
+            variants={riseItem}
+            className="h-full"
+          >
+            <TiltCard className="ba-glass relative h-full rounded-lg border border-[var(--ba-border)] p-5 hover:border-[var(--ba-ink-soft)]">
+            <h3 className="text-sm font-semibold text-[var(--ba-ink)]">
+              Approved workflow selection and policy decision
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ba-muted)]">
+              The selector maps the request to a registered workflow; the policy gate decides
+              ALLOW, REVIEW or BLOCK with an explicit reason before execution.
             </p>
-            <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card px-3">
-              <FragmentRow icon={<Route className="size-3.5 shrink-0 text-teal" aria-hidden />} label="selector decision" value="spatial_clustering" mono />
-              <FragmentRow icon={<ShieldCheck className="size-3.5 shrink-0 text-verified" aria-hidden />} label="policy" value="ALLOW" />
-              <FragmentRow icon={<Inbox className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />} label="matched signals" value="cluster, expression patterns" />
+            <div className="mt-3 divide-y divide-[var(--ba-divider)] rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] px-3">
+              <FragmentRow dot={CYAN} label="selector decision" value="spatial_clustering" mono />
+              <FragmentRow dot={GREEN} label="policy" value="ALLOW" />
+              <FragmentRow dot={GREY} label="matched signals" value="cluster, expression patterns" />
             </div>
-          </article>
+          </TiltCard>
+          </motion.article>
 
           {/* 3. Technical verification */}
-          <article className="rounded-lg border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Technical verification of generated outputs</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Expected artifacts, label alignment, finite numerics and readable outputs are checked
-              against what the workflow actually produced.
+          <motion.article
+            variants={riseItem}
+            className="h-full"
+          >
+            <TiltCard className="ba-glass relative h-full rounded-lg border border-[var(--ba-border)] p-5 hover:border-[var(--ba-ink-soft)]">
+            <h3 className="text-sm font-semibold text-[var(--ba-ink)]">
+              Technical verification of generated outputs
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ba-muted)]">
+              Expected artifacts, label alignment, finite numerics and readable outputs are
+              checked against what the workflow actually produced.
             </p>
-            <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card px-3">
-              <FragmentRow icon={<CheckCircle2 className="size-3.5 shrink-0 text-verified" aria-hidden />} label="labels aligned to obs" value="2,400 / 2,400" mono />
-              <FragmentRow icon={<CheckCircle2 className="size-3.5 shrink-0 text-verified" aria-hidden />} label="embedding finite" value="pass" />
-              <FragmentRow icon={<AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />} label="package versions" value="unavailable" />
+            <div className="mt-3 divide-y divide-[var(--ba-divider)] rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] px-3">
+              <FragmentRow dot={GREEN} label="labels aligned to obs" value="2,400 / 2,400" mono />
+              <FragmentRow dot={GREEN} label="embedding finite" value="pass" />
+              <FragmentRow dot={AMBER} label="package versions" value="unavailable" />
             </div>
-          </article>
+          </TiltCard>
+          </motion.article>
 
           {/* 4. Provenance-linked reporting */}
-          <article className="rounded-lg border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Provenance-linked reporting</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
+          <motion.article
+            variants={riseItem}
+            className="h-full"
+          >
+            <TiltCard className="ba-glass relative h-full rounded-lg border border-[var(--ba-border)] p-5 hover:border-[var(--ba-ink-soft)]">
+            <h3 className="text-sm font-semibold text-[var(--ba-ink)]">Provenance-linked reporting</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--ba-muted)]">
               Reports reference the run, dataset fingerprint, configuration, seed and artifact
               checksums, so results can be traced back to their inputs.
             </p>
-            <div className="mt-3 divide-y divide-border rounded-md border border-border bg-card px-3">
-              <FragmentRow icon={<ScrollText className="size-3.5 shrink-0 text-teal" aria-hidden />} label="run id" value="RUN-2026-0142" mono />
-              <FragmentRow icon={<ScanSearch className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />} label="dataset fingerprint" value="fnv1a:9c41d2a7" mono />
-              <FragmentRow icon={<FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />} label="report version" value="report v1" />
+            <div className="mt-3 divide-y divide-[var(--ba-divider)] rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] px-3">
+              <FragmentRow dot={CYAN} label="run id" value="RUN-2026-0142" mono />
+              <FragmentRow dot={GREY} label="dataset fingerprint" value="fnv1a:9c41d2a7" mono />
+              <FragmentRow dot={GREY} label="report version" value="report v1" />
             </div>
-          </article>
-        </div>
+          </TiltCard>
+          </motion.article>
+        </motion.div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          {(
-            [
-              { icon: Cog, label: "3 approved workflows" },
-              { icon: Route, label: "4-way typed routing" },
-              { icon: ShieldCheck, label: "8 pipeline stages" },
-              { icon: ClipboardCheck, label: "5 evidence states" },
-            ] as const
-          ).map((s) => (
-            <span
-              key={s.label}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-foreground/85"
-            >
-              <s.icon className="size-3.5 text-teal" aria-hidden />
-              {s.label}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-6 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-4">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-          <p className="text-sm leading-relaxed text-foreground/90">
-            <span className="font-medium">Technical verification helps establish whether expected
-            computational checks passed. It does not, by itself, establish biological validity.</span>{" "}
-            The interface keeps this distinction visible throughout: green checks describe artifacts
-            and execution requirements, never biological truth.
+        <div className="mt-6 max-w-3xl border-l-2 border-[var(--ba-ink)] pl-4">
+          <p className="text-sm leading-relaxed text-[var(--ba-body)]">
+            <span className="font-medium text-[var(--ba-ink)]">
+              Technical verification establishes whether expected computational checks passed. It
+              does not, by itself, establish biological validity.
+            </span>{" "}
+            The interface keeps this distinction visible throughout: green checks describe
+            artifacts and execution requirements, never biological truth.
           </p>
         </div>
 
-        {/* Five evidence states */}
-        <div className="mt-6 rounded-lg border border-border bg-background p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">Five evidence states, applied to every claim</h3>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
-              in every report
-            </p>
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Report statements are classified by their linked evidence — not by tone or confidence.
-            The same vocabulary is applied to findings, patterns and explicitly unverified
-            interpretations.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {EVIDENCE_STATE_ITEMS.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-md border border-border bg-card p-3"
-              >
-                <p className="flex items-center gap-1.5 text-xs font-medium">
-                  <s.icon className={cn("size-3.5 shrink-0", s.className)} aria-hidden />
-                  {s.label}
-                </p>
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{s.hint}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Five evidence states — interactive legend */}
+        <EvidenceStates />
 
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          UI fragments above are illustrative examples of the record types, rendered with local demo
+        <p className="mt-6 text-[11px] leading-relaxed text-[var(--ba-faint)]">
+          Records above are illustrative examples of the record types, rendered with local demo
           data. In this build, claim classification is produced by the demo adapter; in the full
           system it is evaluated against the workflow&apos;s evidence contract.
         </p>
-      </div>
+      </Section>
     </section>
   );
 }
+
+/* ---------- Five evidence states: interactive legend ---------- */
 
 const EVIDENCE_STATE_ITEMS = [
-  {
-    icon: CheckCircle2,
-    label: "Supported",
-    className: "text-verified",
-    hint: "Linked evidence supports the claim under stated checks.",
-  },
-  {
-    icon: CircleDot,
-    label: "Plausible",
-    className: "text-teal",
-    hint: "Consistent with the claim, but does not establish it.",
-  },
-  {
-    icon: FlaskConical,
-    label: "Hypothesis",
-    className: "text-warning",
-    hint: "A possible interpretation needing further testing.",
-  },
-  {
-    icon: XCircle,
-    label: "Unsupported",
-    className: "text-error",
-    hint: "Available evidence does not support the claim as stated.",
-  },
-  {
-    icon: CircleDashed,
-    label: "Indeterminate",
-    className: "text-muted-foreground",
-    hint: "Insufficient information to assess the claim.",
-  },
+  { label: "Supported", color: "var(--ba-ev-supported)", hint: "Linked evidence supports the claim under stated checks." },
+  { label: "Plausible", color: "var(--ba-ev-plausible)", hint: "Consistent with the claim, but does not establish it." },
+  { label: "Hypothesis", color: "var(--ba-ev-hypothesis)", hint: "A possible interpretation needing further testing." },
+  { label: "Unsupported", color: "var(--ba-ev-unsupported)", hint: "Available evidence does not support the claim as stated." },
+  { label: "Indeterminate", color: "var(--ba-ev-indeterminate)", hint: "Insufficient information to assess the claim." },
 ] as const;
 
-/* ---------- Research context ---------- */
+const EVIDENCE_EXAMPLES: Record<string, string> = {
+  Supported:
+    "Cluster 2 shows enriched expression of the queried marker gene — the labels aligned (2,400 / 2,400) and the embedding is finite.",
+  Plausible:
+    "The Cluster 2 boundary is consistent with a tissue-domain edge, though the current checks do not establish it.",
+  Hypothesis:
+    "The graded expression across domain 4 may reflect zonation; a targeted follow-up workflow is required.",
+  Unsupported:
+    "A smooth expression gradient across the whole section is not supported by the computed embedding.",
+  Indeterminate:
+    "The relationship between domains 1 and 3 cannot be assessed from the recorded evidence.",
+};
 
-const RELATED_WORK = [
-  {
-    name: "SpatialAgent",
-    venue: "bioRxiv · 2025",
-    url: "https://www.biorxiv.org/content/10.1101/2025.04.03.646459v1",
-    note: "Autonomous agent for spatial biology with dynamic code generation.",
-  },
-  {
-    name: "STAgent",
-    venue: "GitHub · LiuLab, Harvard",
-    url: "https://github.com/LiuLab-Bioelectronics-Harvard/STAgent",
-    note: "Guides spatial analysis input-to-interpretation with generated code.",
-  },
-  {
-    name: "BixBench",
-    venue: "arXiv · 2503.00096",
-    url: "https://arxiv.org/abs/2503.00096",
-    note: "Frontier models reach ≈17% open-answer accuracy on real bioinformatics tasks.",
-  },
-  {
-    name: "BioAgents",
-    venue: "Sci Rep · 2025",
-    url: "https://www.nature.com/articles/s41598-025-25919-z",
-    note: "Multi-agent bioinformatics analysis; gap analysis of agent reliability.",
-  },
-  {
-    name: "Laya",
-    venue: "GitHub · selector",
-    url: "https://github.com/NandhaKishorM/laya",
-    note: "Non-generative typed decision engine — BioAgent-ST's planned selector.",
-  },
-] as const;
+function EvidenceStates() {
+  const [active, setActive] = React.useState<string>("Supported");
+  const activeState =
+    EVIDENCE_STATE_ITEMS.find((s) => s.label === active) ?? EVIDENCE_STATE_ITEMS[0];
 
-export function ResearchContextSection() {
   return (
-    <section
-      id="research-context"
-      className="border-t border-border bg-card py-12"
-      aria-labelledby="research-context-title"
-    >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Research context
+    <div className="mt-12 grid gap-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] lg:gap-10">
+      {/* legend list — the selector */}
+      <div>
+        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ba-muted)]">
+          Five evidence states
         </p>
-        <h2 id="research-context-title" className="mt-1 text-xl font-semibold tracking-tight">
-          Why constrain the agent?
-        </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Autonomous agents for spatial biology can generate and execute analysis code directly. That
-          flexibility is powerful, but it moves the hard question — did the right analysis run, on
-          suitable data, with checkable outputs? — out of view. BioAgent-ST is an intentionally
-          bounded alternative, positioned as a research contribution rather than a product claim.
+        <p className="mt-2 text-sm leading-relaxed text-[var(--ba-body)]">
+          Every statement in a report is classified by its linked evidence — not by tone or
+          confidence. Select a state to see how it reads in practice.
         </p>
-
-        <div className="mt-7 grid gap-4 lg:grid-cols-2">
-          <article className="rounded-lg border border-border bg-background p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <Bot className="size-4 text-muted-foreground" aria-hidden />
-              The autonomous pattern
-            </h3>
-            <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-muted-foreground">
-              <li className="flex gap-2.5">
-                <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-                <span>
-                  Model-generated code executes with few structural limits; correctness depends on
-                  the model&apos;s judgment in the moment.
-                </span>
-              </li>
-              <li className="flex gap-2.5">
-                <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-                <span>
-                  Benchmarks report low open-ended accuracy for frontier models on real
-                  bioinformatics tasks — plausible output is easy, verified output is not.
-                </span>
-              </li>
-              <li className="flex gap-2.5">
-                <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-                <span>
-                  Failures and silent substitutions are hard to detect after the fact when the
-                  execution path is not recorded as evidence.
-                </span>
-              </li>
-            </ul>
-          </article>
-
-          <article className="rounded-lg border border-teal/30 bg-teal/[0.04] p-5">
-            <h3 className="flex items-center gap-2 text-sm font-semibold">
-              <Lock className="size-4 text-teal" aria-hidden />
-              BioAgent-ST&apos;s constrained stance
-            </h3>
-            <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-foreground/85">
-              <li className="flex gap-2.5">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-verified" aria-hidden />
-                <span>
-                  A typed selector chooses from an allowlist of four outcomes — three workflows plus
-                  explicit abstention. No arbitrary code execution, ever.
-                </span>
-              </li>
-              <li className="flex gap-2.5">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-verified" aria-hidden />
-                <span>
-                  Registered deterministic workflows (Scanpy/Squidpy) perform calculations with
-                  recorded configuration and seeds.
-                </span>
-              </li>
-              <li className="flex gap-2.5">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-verified" aria-hidden />
-                <span>
-                  Evidence contracts, technical verification and a provenance ledger make every run
-                  inspectable, testable and replayable — including its failures.
-                </span>
-              </li>
-            </ul>
-          </article>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <div className="rounded-lg border border-border bg-background p-4">
-            <h3 className="text-sm font-semibold">Related systems and evidence</h3>
-            <ul className="mt-2 divide-y divide-border rounded-md border border-border">
-              {RELATED_WORK.map((w) => (
-                <li key={w.name} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-3 py-2">
-                  <a
-                    href={w.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-teal hover:underline"
-                  >
-                    {w.name}
-                    <ExternalLink className="size-3" aria-hidden />
-                  </a>
-                  <span className="text-[10px] font-mono text-muted-foreground">{w.venue}</span>
-                  <span className="basis-full text-[11px] leading-snug text-muted-foreground">
-                    {w.note}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              Links are provided for context only — listed systems are independent projects; their
-              appearance here is not an evaluation or endorsement.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <div className="rounded-lg border border-border bg-background p-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
-                Working title
-              </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">
-                BioAgent-ST: Constrained Workflow Selection and Evidence-Linked Verification for
-                Reproducible Spatial Transcriptomics Exploration
-              </p>
-            </div>
-            <div className="rounded-lg border border-border bg-background p-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
-                Evaluation focus
-              </p>
-              <ul className="mt-1.5 space-y-1 text-[11px] leading-snug text-muted-foreground">
-                <li>RQ1 routing reliability · RQ2 fault detection</li>
-                <li>RQ3 traceability · RQ4 Laya vs rules</li>
-                <li>RQ5 safe caution on unsupported requests</li>
-              </ul>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3 w-full justify-between"
-                onClick={() => navigateTo(APP_ROUTES.evaluation)}
+        <div
+          role="tablist"
+          aria-label="Evidence states"
+          className="mt-4 flex flex-row flex-wrap gap-2 lg:flex-col"
+        >
+          {EVIDENCE_STATE_ITEMS.map((s) => {
+            const isActive = active === s.label;
+            return (
+              <button
+                key={s.label}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActive(s.label)}
+                className={cn(
+                  "ba-focus flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors lg:w-full",
+                  isActive
+                    ? "border-[var(--ba-ink-soft)] bg-[var(--ba-paper)]"
+                    : "border-transparent hover:bg-[var(--ba-paper)]",
+                )}
               >
-                Open the evaluation protocol
-                <ArrowRight className="size-3.5" aria-hidden />
-              </Button>
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ background: s.color }}
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "text-sm font-medium",
+                    isActive ? "text-[var(--ba-ink)]" : "text-[var(--ba-body)]",
+                  )}
+                >
+                  {s.label}
+                </span>
+                <span className="ml-auto hidden max-w-[190px] text-right text-[11px] leading-tight text-[var(--ba-faint)] xl:block">
+                  {s.hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* active-state explanation */}
+      <div className="ba-glass-strong rounded-lg border border-[var(--ba-border)] p-6 lg:self-start">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <p className="flex items-center gap-2.5">
+              <span
+                className="size-3 rounded-full"
+                style={{ background: activeState.color }}
+                aria-hidden
+              />
+              <span className="text-[15px] font-semibold text-[var(--ba-ink)]">{activeState.label}</span>
+              <span className="rounded-full border border-[var(--ba-border)] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[var(--ba-muted)]">
+                evidence state
+              </span>
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--ba-body)]">{activeState.hint}</p>
+            <div className="mt-4 rounded-md border border-[var(--ba-border)] bg-[var(--ba-paper)] p-4" aria-live="polite">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--ba-muted)]">
+                Example claim
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--ba-ink)]">
+                {EVIDENCE_EXAMPLES[active]}
+              </p>
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Limitations ---------- */
-
-export function LimitationsSection() {
-  return (
-    <section className="border-t border-border bg-background py-12" aria-labelledby="limitations-title">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Scope</p>
-        <h2 id="limitations-title" className="mt-1 text-xl font-semibold tracking-tight">
-          Limitations
-        </h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <ul className="space-y-3 rounded-lg border border-border bg-card p-5 text-sm leading-relaxed text-muted-foreground">
-            <li className="flex gap-2.5">
-              <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-              <span>
-                BioAgent-ST assists with <span className="font-medium text-foreground">bounded analysis workflows</span>{" "}
-                on supported datasets. It is not a system for autonomous biological discovery, and its
-                outputs are starting points for researcher review, not conclusions.
-              </span>
-            </li>
-            <li className="flex gap-2.5">
-              <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-              <span>
-                Verification is technical: it checks artifacts, alignment and finiteness. It does not
-                prove that a result is biologically valid, causal, or clinically meaningful.
-              </span>
-            </li>
-            <li className="flex gap-2.5">
-              <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-              <span>
-                Computational clusters are groupings of expression patterns. They are not
-                automatically cell types, tissue domains or disease mechanisms.
-              </span>
-            </li>
-            <li className="flex gap-2.5">
-              <XCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
-              <span>
-                Evaluation metrics for selector routing, fault detection and traceability are planned
-                research measurements. None are reported as measured performance in this prototype.
-              </span>
-            </li>
-          </ul>
-          <div className="rounded-lg border border-border bg-secondary/50 p-5">
-            <h3 className="text-sm font-semibold">What this prototype is</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              A research frontend demonstrating the intended interaction model: constrained workflow
-              selection, policy decisions, technical verification and provenance-linked reporting.
-              In this build all scientific data is generated locally and labeled as illustrative;
-              a real deployment replaces the demo adapter with the scientific backend.
+            <p className="mt-4 text-xs leading-relaxed text-[var(--ba-faint)]">
+              The same vocabulary is applied to findings, patterns and explicitly unverified
+              interpretations. Failures and incomplete runs are preserved in the interface
+              rather than hidden.
             </p>
-            <h3 className="mt-4 text-sm font-semibold">What it does not claim</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              The system is not described as hallucination-free, universally reliable, clinically
-              validated, or guaranteed to be scientifically correct. Failures and incomplete runs are
-              preserved in the interface rather than hidden.
-            </p>
-          </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </section>
-  );
-}
-
-/* ---------- Footer ---------- */
-
-export function LandingFooter() {
-  return (
-    <footer id="documentation" className="border-t border-border bg-card">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-start md:justify-between">
-        <div className="max-w-sm">
-          <Wordmark />
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            An evidence-aware workflow assistant for spatial transcriptomics. Research prototype built
-            for the BioAgent-ST project: natural-language questions, approved workflows, technical
-            verification and reproducible reports.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-8 text-xs sm:grid-cols-3">
-          <div>
-            <p className="font-medium text-foreground">Sections</p>
-            <ul className="mt-2 space-y-1.5 text-muted-foreground">
-              {NAV_LINKS.map((l) => (
-                <li key={l.label}>
-                  <a className="hover:text-foreground" href={l.href}>
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <p className="font-medium text-foreground">Project</p>
-            <ul className="mt-2 space-y-1.5 text-muted-foreground">
-              <li className="flex items-start gap-1.5">
-                <Github className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                <a
-                  className="hover:text-foreground"
-                  href="https://github.com/thekarak/BioAgent-ST"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  BioAgent-ST (backend)
-                </a>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <Github className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                <a
-                  className="hover:text-foreground"
-                  href="https://github.com/NandhaKishorM/laya"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Laya selector
-                </a>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <Github className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                <span>This frontend repository link will be added when it is published.</span>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-medium text-foreground">Documentation</p>
-            <p className="mt-2 flex items-start gap-1.5 text-muted-foreground">
-              <BookOpen className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              Project documentation has not been published yet; this link will be added when the
-              documentation is available.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="border-t border-border">
-        <p className="mx-auto max-w-6xl px-4 py-3 text-[11px] text-muted-foreground sm:px-6">
-          BioAgent-ST research prototype · All demo content is illustrative and generated locally in
-          your browser.
-        </p>
-      </div>
-    </footer>
+    </div>
   );
 }

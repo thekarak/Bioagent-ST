@@ -186,3 +186,469 @@
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
+
+/* ================================================================ */
+/* Landing: minimal editorial system — light "paper" + dark          */
+/* "observatory" themes, driven by scoped CSS tokens.                 */
+/* ================================================================ */
+
+/* Light tokens (default) — white, hairlines, data color. */
+.ba-landing {
+  --ba-bg: #ffffff;
+  --ba-paper: #fafaf9;
+  --ba-panel: #ffffff;
+  --ba-ink: #111417;
+  --ba-body: #3f4650;
+  --ba-muted: #6e7480;
+  --ba-faint: #9aa0a6;
+  --ba-border: #e7e7e9;
+  --ba-divider: #edeef0;
+  --ba-input: #d8dadd;
+  --ba-ink-hover: #2a2f36;
+  --ba-hover-soft: #edeef0;
+  --ba-ink-soft: rgba(17, 20, 23, 0.32);
+  --ba-dot: #d9dbde;
+  --ba-onink: rgba(255, 255, 255, 0.68);
+  --ba-onink-soft: rgba(255, 255, 255, 0.5);
+  --ba-onink-border: rgba(255, 255, 255, 0.25);
+  --ba-onink-wash: rgba(255, 255, 255, 0.1);
+  --ba-shadow-c: rgba(17, 20, 23, 0.07);
+  --ba-shadow-strong: rgba(17, 20, 23, 0.14);
+  /* status + evidence-state semantics (brightened for dark surfaces) */
+  --ba-ok: #15803d;
+  --ba-info: #0e7490;
+  --ba-warn: #b45309;
+  --ba-err: #b91c1c;
+  --ba-neutral: #9aa0a6;
+  --ba-warn-soft: rgba(180, 83, 9, 0.5);
+  --ba-ev-supported: #15803d;
+  --ba-ev-plausible: #0e7490;
+  --ba-ev-hypothesis: #b45309;
+  --ba-ev-unsupported: #b91c1c;
+  --ba-ev-indeterminate: #6e7480;
+  /* wordmark */
+  --ba-wm-bg: #f5f5f4;
+  --ba-wm-line: #e7e7e9;
+  --ba-wm-ink: #111417;
+  --ba-wm-accent: #111417;
+  --ba-wm-sub: #3f4650;
+  /* glass over the persistent WebGL world */
+  --ba-glass: rgba(255, 255, 255, 0.66);
+  --ba-glass-strong: rgba(255, 255, 255, 0.85);
+  --ba-glare: rgba(17, 20, 23, 0.05);
+  /* centre wash that keeps text over the world legible — light enough
+     that the formations stay clearly readable behind the copy; panels
+     and the glass figures carry their own legibility */
+  --ba-wash: rgba(255, 255, 255, 0.4);
+  --ba-wash-strong: rgba(255, 255, 255, 0.62);
+  /* frosted CTA band (ink in light paper, paper in the dark observatory) */
+  --ba-cta: rgba(17, 20, 23, 0.88);
+  background: var(--ba-bg);
+  color: var(--ba-ink);
+}
+
+/* Dark tokens — near-black observatory: ink inverts to near-white, so
+   buttons and the CTA band flip automatically; data hues glow. */
+.ba-landing.ba-dark {
+  --ba-bg: #0b0d10;
+  --ba-paper: #101317;
+  --ba-panel: #0d1013;
+  --ba-ink: #edf1f5;
+  --ba-body: #b9c2cc;
+  --ba-muted: #8d97a3;
+  --ba-faint: #626c77;
+  --ba-border: #22272e;
+  --ba-divider: #1a1f25;
+  --ba-input: #2e353d;
+  --ba-ink-hover: #d7dde4;
+  --ba-hover-soft: #171c22;
+  --ba-ink-soft: rgba(237, 241, 245, 0.38);
+  --ba-dot: rgba(255, 255, 255, 0.1);
+  --ba-onink: rgba(10, 12, 15, 0.62);
+  --ba-onink-soft: rgba(10, 12, 15, 0.45);
+  --ba-onink-border: rgba(10, 12, 15, 0.28);
+  --ba-onink-wash: rgba(10, 12, 15, 0.12);
+  --ba-shadow-c: rgba(0, 0, 0, 0.45);
+  --ba-shadow-strong: rgba(0, 0, 0, 0.6);
+  --ba-ok: #4ade80;
+  --ba-info: #38bdf8;
+  --ba-warn: #fbbf24;
+  --ba-err: #f87171;
+  --ba-neutral: #8d97a3;
+  --ba-warn-soft: rgba(251, 191, 36, 0.55);
+  --ba-ev-supported: #34d399;
+  --ba-ev-plausible: #38bdf8;
+  --ba-ev-hypothesis: #fbbf24;
+  --ba-ev-unsupported: #f87171;
+  --ba-ev-indeterminate: #98a2ad;
+  --ba-wm-bg: #171b21;
+  --ba-wm-line: #2a313a;
+  --ba-wm-ink: #edf1f5;
+  --ba-wm-accent: #56b4e9;
+  --ba-wm-sub: #8d97a3;
+  --ba-glass: rgba(13, 16, 19, 0.55);
+  --ba-glass-strong: rgba(13, 16, 19, 0.8);
+  --ba-glare: rgba(255, 255, 255, 0.07);
+  --ba-wash: rgba(11, 13, 16, 0.38);
+  --ba-wash-strong: rgba(11, 13, 16, 0.55);
+  /* frosted CTA band (ink in light paper, paper in the dark observatory) */
+  --ba-cta: rgba(237, 241, 245, 0.9);
+}
+
+html:has(.ba-landing) {
+  scroll-behavior: smooth;
+  background: #ffffff;
+  color-scheme: light;
+}
+html:has(.ba-landing.ba-dark) {
+  background: #0b0d10;
+  color-scheme: dark;
+}
+.ba-landing ::selection {
+  background: var(--ba-ink);
+  color: var(--ba-bg);
+}
+/* Re-map the workspace token utilities used by shared components (Wordmark)
+   onto the landing token system. */
+.ba-landing .text-foreground {
+  color: var(--ba-ink);
+}
+.ba-landing .text-teal {
+  color: var(--ba-ink);
+}
+.ba-landing .text-muted-foreground {
+  color: var(--ba-muted);
+}
+.ba-landing .text-verified {
+  color: var(--ba-ok);
+}
+.ba-landing .text-warning {
+  color: var(--ba-warn);
+}
+.ba-landing .text-error {
+  color: var(--ba-err);
+}
+.ba-landing .ba-focus:focus-visible {
+  outline-color: var(--ba-ink-soft);
+}
+.ba-landing section[id],
+.ba-landing footer[id] {
+  scroll-margin-top: 4.5rem;
+}
+
+/* Hero entrance: word-by-word rise (small, quiet). */
+.ba-hero-word {
+  display: inline-block;
+  opacity: 0;
+  animation: ba-hero-word 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--wd, 0ms);
+}
+
+/* Scroll-triggered reveal (IntersectionObserver toggles data-visible). */
+.ba-reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.ba-reveal[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Fixed navigation — translucent surface, hairline appears when scrolled. */
+.ba-nav {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+.ba-landing.ba-dark .ba-nav {
+  background: rgba(11, 13, 16, 0.82);
+}
+.ba-nav[data-scrolled="true"] {
+  border-bottom-color: var(--ba-border);
+}
+
+/* Figure panel (the 3D "Fig." viewports) — a glass slab over the living
+   world: the particle field glows through the frosted surface. */
+.ba-figure {
+  border: 1px solid var(--ba-border);
+  border-radius: 10px;
+  background: var(--ba-glass-strong);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.ba-landing.ba-dark .ba-figure {
+  box-shadow: 0 18px 50px -22px var(--ba-shadow-strong);
+}
+
+/* Soft radial grounding behind the DNA figure — subtle in light, a faint
+   instrument glow in dark. */
+.ba-figure-glow {
+  background: radial-gradient(58% 52% at 50% 48%, rgba(17, 20, 23, 0.05), transparent 72%);
+}
+.ba-landing.ba-dark .ba-figure-glow {
+  background: radial-gradient(58% 52% at 50% 48%, rgba(86, 180, 233, 0.12), transparent 72%);
+}
+
+/* Static dot-grid stand-in when WebGL is unavailable. */
+.ba-fallback-dots {
+  background-image: radial-gradient(var(--ba-dot) 1.1px, transparent 1.1px);
+  background-size: 26px 26px;
+}
+
+/* Floating record chip (DNA base-pair tooltip / spot inspect card). */
+.ba-chip {
+  border: 1px solid var(--ba-border);
+  background: var(--ba-bg);
+  box-shadow: 0 8px 30px var(--ba-shadow-strong);
+}
+
+/* ---------------- Scroll-lit pipeline ---------------- */
+
+.ba-pipe-node {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.45s ease,
+    box-shadow 0.45s ease,
+    color 0.45s ease,
+    background-color 0.45s ease;
+}
+.ba-pipe-node[data-lit="true"] {
+  transform: translateY(-2px);
+}
+.ba-pipe-node[data-current="true"] {
+  transform: translateY(-3px);
+}
+.ba-pipe-node[data-current="true"] .ba-pipe-circle::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--ba-ink-soft);
+  animation: ba-pipe-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ba-pipe-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+.ba-pipe-fill {
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------------- Persistent 3D world ---------------- */
+
+/* The fixed full-viewport WebGL canvas behind every section. The
+   ::after wash keeps body copy over the field legible — a soft radial
+   veil that clears toward the edges, where the world is meant to
+   breathe. Stronger on small screens, where the field runs closer to
+   the text. */
+.ba-world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  contain: strict;
+}
+.ba-world::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    118% 86% at 50% 44%,
+    var(--ba-wash) 0%,
+    transparent 78%
+  );
+}
+@media (max-width: 767px) {
+  .ba-world::after {
+    background: radial-gradient(
+      132% 80% at 50% 32%,
+      var(--ba-wash-strong) 0%,
+      transparent 78%
+    );
+  }
+}
+
+/* Frosted CTA band — the ink anchor, now translucent so the closing
+   formation glows through it. */
+.ba-cta {
+  background: var(--ba-cta);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Frosted surfaces so content floats over the world. */
+.ba-glass {
+  background: var(--ba-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.ba-glass-strong {
+  background: var(--ba-glass-strong);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* ---------------- Tilt cards ---------------- */
+
+.ba-tilt {
+  transform: perspective(1000px) rotateX(var(--ba-rx, 0deg)) rotateY(var(--ba-ry, 0deg));
+}
+.ba-tilt[data-tilt="live"] {
+  will-change: transform;
+}
+.ba-tilt[data-tilt="idle"] {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.ba-tilt-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    260px circle at var(--ba-gx, 50%) var(--ba-gy, 50%),
+    var(--ba-glare),
+    transparent 65%
+  );
+}
+.ba-tilt[data-tilt="live"] .ba-tilt-glare {
+  opacity: 1;
+}
+
+/* ---------------- Chapter rail (desktop) ---------------- */
+
+.ba-rail {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (min-width: 1024px) {
+  .ba-rail {
+    display: flex;
+  }
+}
+.ba-rail-tick {
+  position: relative;
+  display: flex;
+  height: 18px;
+  width: 18px;
+  align-items: center;
+  justify-content: flex-end;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.ba-rail-line {
+  width: 11px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: var(--ba-faint);
+  transition:
+    width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.35s ease;
+}
+.ba-rail-tick:hover .ba-rail-line,
+.ba-rail-tick[data-active="true"] .ba-rail-line {
+  background: var(--ba-ink);
+}
+.ba-rail-tick[data-active="true"] .ba-rail-line {
+  width: 19px;
+}
+.ba-rail-label {
+  position: absolute;
+  right: 27px;
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  text-align: right;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ba-muted);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.ba-rail-tick:hover .ba-rail-label {
+  opacity: 1;
+}
+.ba-rail-sub {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--ba-faint);
+}
+
+/* ---------------- Keyframes ---------------- */
+
+@keyframes ba-hero-word {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------- Reduced motion ---------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.ba-landing) {
+    scroll-behavior: auto;
+  }
+  .ba-hero-word {
+    animation: none;
+    opacity: 1;
+  }
+  .ba-reveal {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .ba-pipe-node,
+  .ba-pipe-fill,
+  .ba-nav {
+    transition: none;
+  }
+  .ba-pipe-node[data-current="true"] .ba-pipe-circle::after {
+    animation: none;
+  }
+  .ba-tilt,
+  .ba-tilt[data-tilt="idle"],
+  .ba-tilt-glare,
+  .ba-rail-line,
+  .ba-rail-label {
+    transition: none;
+  }
+  .ba-rail-label,
+  .ba-tilt-glare {
+    opacity: 0;
+  }
+}

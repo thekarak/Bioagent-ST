@@ -1,8 +1,7 @@
 # AGENTS.md — BioAgent-ST Frontend
 
-Instructions for AI coding agents (Google Antigravity, Gemini CLI, and other
-AGENTS.md-compatible tools) working in this repository. Read this before
-making changes.
+Instructions for coding agents and contributors working in this repository.
+Read this before making changes.
 
 ## Project context
 

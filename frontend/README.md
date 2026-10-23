@@ -1,13 +1,18 @@
 # BioAgent ST — Frontend
 
 The web frontend for **BioAgent-ST**, an evidence-aware, constrained agentic workflow
-assistant for spatial transcriptomics. This directory contains the research-workspace UI;
-the backend will live in the sibling `backend/` directory of [thekarak/BioAgent-ST](https://github.com/thekarak/BioAgent-ST).
+assistant for spatial transcriptomics. This repo contains the research-workspace UI;
+the backend lives at [thekarak/BioAgent-ST](https://github.com/thekarak/BioAgent-ST).
 
 ## Highlights
 
-- **Landing page** introducing the assistant and its constrained pipeline, with research
-  context (related systems, working title, evaluation focus)
+- **Landing page** with an interactive **3D hero** — a rotating, draggable
+  point-cloud "tissue section" (canvas, no 3D library) where spots are
+  clickable and inspectable — plus scroll-triggered reveals, a reading
+  progress bar, scroll-spy navigation, animated stat counters, 3D tilt
+  workflow cards, interactive evidence-state cards, and a CTA banner; all
+  motion honors `prefers-reduced-motion`. Research context (related systems,
+  working title, evaluation focus) included.
 - **Research workspace** (hash-routed single-page app):
   - Overview dashboard with recent runs and system status
   - New Analysis flow (dataset + workflow selection with parameter constraints)
@@ -97,6 +102,12 @@ the real backend:
 5. **Deploy** — the frontend deploys cleanly to Vercel/Netlify; run BioAgent-ST on
    its own host and set the env var in the deploy dashboard.
 
+## Developing with coding agents
 
+This directory includes an [`AGENTS.md`](./AGENTS.md) file providing project
+context, tech stack overview, domain model, backend integration plan, and
+guardrails. Coding tools and agents can read it to align with the project
+standards.
 
-
+To work on this codebase, clone the repository and run the setup commands
+from **Getting started** above.

@@ -56,8 +56,14 @@ local-*
 prompt
 
 # dev verification screenshots (kept locally, not part of the app)
-scripts/verify-*.png
+scripts/verify*.png
 
 # vercel
 .vercel
 scripts/vlm-*.json
+
+# tool result artifacts
+tool-results/
+
+# verification screenshots (local only)
+scripts/shots/
