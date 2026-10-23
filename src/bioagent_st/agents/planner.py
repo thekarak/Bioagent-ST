@@ -75,6 +75,8 @@ class Planner:
             try:
                 payload = self.client.generate_plan(question, context)
                 payload["created_at"] = datetime.now(UTC)
+                # Attach the selector decision so the policy gate can use it.
+                payload.setdefault("selector_decision", decision.model_dump())
                 plan = validate_plan(AnalysisPlan.model_validate(payload))
                 return plan
             except (ValidationError, PlanValidationError, ValueError) as error:

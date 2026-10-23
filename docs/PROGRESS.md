@@ -1,6 +1,21 @@
-# Progress log — BioAgent-ST
+﻿# Progress log — BioAgent-ST
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
+
+## 2026-10-24 — Policy gate, workflow registry, ablation schema, and fault-injection routing suite
+
+- **Phase/Task:** Blueprint gap remediation — explicit policy gate (ALLOW/REVIEW/BLOCK), enum workflow registry, `AgentConfig` ablation schema, and routing fault-injection benchmark.
+- **Done:**
+  - Implemented `verification/policy_gate.py` with `PolicyDecision = ALLOW | REVIEW | BLOCK`, `EvidenceBand` calculator (`evidence_band_from_checks`), and `gate_request()`.
+  - Implemented `schemas/registry.py` `WorkflowRegistry` (`REGISTRY`) mapping `SupportedWorkflowId` to contracts and executors with enum enforcement.
+  - Implemented `schemas/agent_config.py` `AgentConfig` for ablation control (`ledger_enabled`, `critic_enabled`, `gating_enabled`, `provenance_constraints_enabled`, `selector`).
+  - Integrated policy gate into `execute_plan()` to evaluate intermediate check evidence bands and halt/flag blocked runs.
+  - Extended `scripts/evaluate_routing.py` with `FAULT_INJECTION_BENCHMARK` (empty, whitespace, gibberish, prompt-injection, extreme length, ambiguity, negation, Unicode) and `evaluate_selector_pair()`.
+  - Added unit test suites `test_policy_gate.py`, `test_registry.py`, and `test_routing_fault_injection.py` (total test suite expanded to 133 tests).
+  - All 133 tests pass in `uv run pytest -q`; `ruff check` and formatting clean; `mypy` clean.
+- **Next:** Phase 4 — LangGraph execution graph port with downgrade-only critic.
+- **Open questions:** Science reviewer confirmation of provisional thresholds.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; no project failures.
 
 ## 2026-10-23 — Canonical workflows, routing evaluation, and FastAPI/Frontend integration
 

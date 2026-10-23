@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from pydantic import Field, model_validator
 
 from bioagent_st.schemas.base import FrozenRecord
+from bioagent_st.schemas.workflows import SelectorDecision
 
 
 class AnalysisStep(FrozenRecord):
@@ -23,9 +26,12 @@ class AnalysisPlan(FrozenRecord):
     constraints: list[str] = Field(default_factory=list)
     created_by_model: str
     created_at: datetime
+    # The SelectorDecision that produced this plan — used by the policy gate.
+    # Optional so that existing serialised plans (without this field) still load.
+    selector_decision: SelectorDecision | None = Field(default=None)
 
     @model_validator(mode="after")
-    def reject_duplicate_step_ids(self) -> "AnalysisPlan":
+    def reject_duplicate_step_ids(self) -> AnalysisPlan:
         step_ids = [step.step_id for step in self.steps]
         duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
         if duplicates:

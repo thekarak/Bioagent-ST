@@ -1,3 +1,15 @@
+## 2026-10-24 — Explicit policy gate, workflow registry, and fault-injection harness
+
+- **Context:** Blueprint audit identified four key requirements: (1) explicit policy gate (ALLOW / REVIEW / BLOCK); (2) workflows strictly enforced through an enum-only registry; (3) `AgentConfig` ablation flags; (4) fault-injection test suite for routing robustness.
+- **Decision:**
+  - Implemented `verification/policy_gate.py` with pure `gate_request()` returning `GateResult` (ALLOW/REVIEW/BLOCK). Decisions are governed by `SelectorDecision.confidence` and `EvidenceBand` derived deterministically from checks. LLM is never called in the gate.
+  - Added `schemas/registry.py` `WorkflowRegistry` (`REGISTRY`) singleton as the single source of truth for workflow IDs and contracts.
+  - Implemented `schemas/agent_config.py` `AgentConfig` with `ledger_enabled`, `critic_enabled`, `gating_enabled`, `provenance_constraints_enabled`, and `selector` flags to support clean ablations.
+  - Integrated policy gate into `execute_plan()`: derives evidence band from step checks and gates downstream continuation.
+  - Added `FAULT_INJECTION_BENCHMARK` and `evaluate_selector_pair()` to `scripts/evaluate_routing.py` probing edge cases (empty, whitespace, gibberish, prompt injection, extreme length, ambiguity, negation, Unicode).
+- **Alternatives:** Ad-hoc gate checks in executor (rejected); LLM-evaluated gating (rejected for non-determinism).
+- **Consequences:** The system explicitly guards against ambiguous execution and low evidence; test suite expanded to 133 tests.
+
 ## 2026-10-23 — Canonical workflow contracts and routing architecture
 
 - **Context:** The system required explicit execution boundaries for research queries, request intent classification, and integration between the web frontend and deterministic scientific backend.

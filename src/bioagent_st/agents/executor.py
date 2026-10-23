@@ -12,6 +12,7 @@ from bioagent_st.analysis.qc import QCParams
 from bioagent_st.analysis.spatial import SpatialParams, build_spatial_graph
 from bioagent_st.ledger.evidence_store import EvidenceStore
 from bioagent_st.ledger.provenance_store import ProvenanceStore
+from bioagent_st.schemas.agent_config import AgentConfig
 from bioagent_st.schemas.evidence import CheckResult, EvidenceRecord
 from bioagent_st.schemas.plans import AnalysisPlan
 from bioagent_st.tools.workflow import (
@@ -35,11 +36,22 @@ from bioagent_st.verification.checks import (
     qc_pass_check,
     spatial_graph_check,
 )
+from bioagent_st.verification.policy_gate import (
+    EvidenceBand,
+    GateConfig,
+    GateResult,
+    evidence_band_from_checks,
+    gate_request,
+)
 from bioagent_st.verification.rules import evidence_from_checks
 
 
 class ExecutionError(RuntimeError):
     pass
+
+
+class PolicyBlockError(RuntimeError):
+    """Raised when the policy gate returns BLOCK."""
 
 
 @dataclass(frozen=True)
@@ -51,6 +63,7 @@ class ExecutionResult:
     step_artifact_ids: dict[str, list[str]]
     warnings: list[str]
     needs_review: bool
+    gate_results: list[GateResult]
 
 
 def _claim_evidence(
@@ -175,22 +188,33 @@ def _gene_expression_evidence(
     return evidence
 
 
+def _derive_evidence_band(checks: list[CheckResult]) -> EvidenceBand:
+    """Convert a list of CheckResult objects to an EvidenceBand."""
+    return evidence_band_from_checks(checks)  # type: ignore[arg-type]
+
+
 def execute_plan(
     plan: AnalysisPlan,
     adata: ad.AnnData,
     output_dir: str | Path,
     experiment_id: str,
     dataset_hash: str | None = None,
+    config: AgentConfig | None = None,
 ) -> ExecutionResult:
+    cfg = config or AgentConfig()
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     provenance_store = ProvenanceStore(output / "ledger.db")
-    evidence_store = EvidenceStore(output / "ledger.db")
+    evidence_store = EvidenceStore(output / "ledger.db") if cfg.ledger_enabled else None
+    gate_config = GateConfig(disabled=not cfg.gating_enabled)
+
     current = adata
     artifact_ids: list[str] = []
     step_artifact_ids: dict[str, list[str]] = {}
     warnings: list[str] = []
     needs_review = False
+    gate_results: list[GateResult] = []
+
     try:
         for step in plan.steps:
             if step.tool_name == "quality_assessment":
@@ -267,6 +291,7 @@ def execute_plan(
                 )
             else:
                 raise ExecutionError(f"unregistered tool: {step.tool_name}")
+
             if result.status == "error":
                 raise ExecutionError(result.error or f"tool failed: {step.tool_name}")
             if result.status == "partial":
@@ -274,6 +299,31 @@ def execute_plan(
             warnings.extend(result.warnings)
             artifact_ids.extend(result.artifact_ids)
             step_artifact_ids[step.step_id] = result.artifact_ids
+
+            # --- Policy gate (post-step evidence band) ----------------------
+            if cfg.gating_enabled and plan.selector_decision is not None:
+                band = _derive_evidence_band(list(result.checks))
+                gate = gate_request(
+                    plan.selector_decision,
+                    evidence_band=band,
+                    config=gate_config,
+                )
+                gate_results.append(gate)
+                if gate.decision == "BLOCK":
+                    needs_review = True
+                    warnings.append(
+                        f"Policy gate BLOCKED after step '{step.tool_name}': "
+                        + "; ".join(gate.reasons)
+                    )
+                    # Stop further steps — the gate prevents continuation.
+                    break
+                if gate.decision == "REVIEW":
+                    needs_review = True
+                    warnings.append(
+                        f"Policy gate REVIEW after step '{step.tool_name}': "
+                        + "; ".join(gate.reasons)
+                    )
+
         evidence = _claim_evidence(
             experiment_id,
             current,
@@ -281,8 +331,11 @@ def execute_plan(
             artifact_ids,
         )
         evidence.extend(_gene_expression_evidence(experiment_id, current, output, artifact_ids))
-        for record in evidence:
-            evidence_store.insert(record)
+
+        if evidence_store is not None:
+            for record in evidence:
+                evidence_store.insert(record)
+
         return ExecutionResult(
             plan,
             artifact_ids,
@@ -291,7 +344,9 @@ def execute_plan(
             step_artifact_ids,
             warnings,
             needs_review,
+            gate_results,
         )
     finally:
-        evidence_store.close()
+        if evidence_store is not None:
+            evidence_store.close()
         provenance_store.close()
