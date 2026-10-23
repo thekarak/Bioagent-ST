@@ -3,7 +3,6 @@
 **Load the skill `bioagent-st-builder` at the start of every session, even for small tasks.**
 
 - Skill file: [`skills/bioagent-st-builder/SKILL.md`](skills/bioagent-st-builder/SKILL.md)
-- Source copy: `SKILL (1).md` (identical SHA256; keep `skills/.../SKILL.md` as the canonical path)
 - Blueprint (read-only reference): `C:\Users\sfors\Downloads\BioAgent-ST_Complete_Research_and_Implementation_Blueprint.pdf`
 - Extracted blueprint text: `_blueprint_extracted.txt` (regenerate with pypdf if the PDF changes)
 

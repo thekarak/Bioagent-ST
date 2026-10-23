@@ -38,6 +38,8 @@ Desktop.ini
 .claude*
 **/.claude/**
 **/.claude*
+SKILL*.md
+SKILL (*).md
 
 # Data and artifacts — never commit datasets, h5ad, generated outputs, or keys
 data/raw/
