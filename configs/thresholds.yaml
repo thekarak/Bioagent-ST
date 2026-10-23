@@ -1,0 +1,39 @@
+# Provisional science thresholds — BioAgent-ST
+# Every threshold here is a PROVISIONAL DEFAULT until the science reviewer signs off.
+# Logic must read from this file; never hard-code thresholds in code (skill §2.2, §8.3).
+# TODO(science-review): confirm all values below.
+
+provisional: true
+science_reviewer: null
+last_reviewed: null
+
+qc:
+  min_genes: 200
+  min_cells: 3
+  max_mito_pct: 20.0
+  mito_prefix: "MT-"   # species-dependent: "mt-" for mouse; validate against var_names
+
+cluster:
+  min_cluster_size: 10
+  stability_ari_min: 0.6      # provisional
+  resolutions_grid: [0.4, 0.6, 0.8, 1.0]
+  n_stability_seeds: 3
+
+marker:
+  min_group_size: 10
+  max_padj: 0.05
+  min_logfold_change: 1.0
+  min_effect_size: 0.2        # provisional; document metric in method note
+  corr_method: "benjamini-hochberg"
+  circularity_flag: always    # markers from same expression data are descriptive only
+
+spatial:
+  min_mean_degree: 6          # provisional
+  max_isolated_fraction: 0.01
+  min_perms: 100
+  max_moran_padj: 0.05
+
+power:
+  # Proxies only — NOT a formal power analysis (skill §8.2 stat.power_proxy)
+  min_spots_per_group: 10
+  max_zero_fraction: 0.95

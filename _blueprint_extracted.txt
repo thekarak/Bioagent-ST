@@ -1,0 +1,951 @@
+BIOAGENT-ST
+ Toward a Verified Scientific Agent for Spatial Transcriptomics
+ Research, Architecture, Technology Stack, Evaluation Framework, and Two-Person
+ Implementation Blueprint
+ Verification  Structured Uncertainty  Provenance  Reproducibility
+A practical research blueprint for a two-person team building a reproducible,
+evidence-bound, verification-first spatial transcriptomics agent.
+Document date: 20 September 2026
+Status: Working research and engineering blueprint. Proposed architecture and experiments must be validated through implementation
+and empirical study.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 2
+Executive Summary
+BioAgent-ST is proposed as a verification-first scientific agent for spatial transcriptomics. Rather than treating an
+LLM as an unrestricted analyst that produces fluent biological narratives, the system is designed as a controlled
+scientific workflow in which analysis tools execute deterministic computations, intermediate artifacts are recorded,
+claims are evaluated against evidence, and uncertainty influences the system's behavior.
+The central research question is whether active verification, structured uncertainty, and provenance constraints
+can reduce unsupported biological assertions compared with strong tool-using baselines, particularly when data
+are noisy, sparse, platform-shifted, statistically underpowered, or biologically ambiguous.
+Core design principle
+Verification is not a post-hoc safety layer. It is a first-class scientific capability that participates continuously in
+planning, execution, interpretation, escalation, and reporting.
+The project should be built in layers:
+1
+A deterministic scientific analysis layer built around AnnData, Scanpy, Squidpy, and statistical libraries.
+2
+A typed tool interface that exposes validated scientific operations instead of unrestricted arbitrary code
+execution.
+3
+A stateful Planner–Executor workflow connected to a Verifier–Critic loop.
+4
+A live five-state evidence ledger for claim-level classification.
+5
+A provenance-native artifact system that records dataset hashes, code versions, parameters, random seeds, tool
+versions, timestamps, and lineage.
+6
+An evaluation harness containing baseline comparisons, ablations, controlled degradation, auditability checks,
+and expert or structured review.
+This document combines the project context, recommended technology stack, architecture, data models, team
+division, research methodology, implementation roadmap, risks, and paper-development guidance.
+1. Research Identity and Scope
+1.1 What BioAgent-ST is
+BioAgent-ST is a research prototype for scientific analysis of spatial transcriptomics data. It receives a biological
+research question and a dataset, constructs a constrained analysis plan, invokes validated computational tools,
+evaluates intermediate evidence, and produces an auditable report.
+1.2 What BioAgent-ST is not
+●
+It is not simply a chatbot that explains spatial transcriptomics.
+●
+It is not a replacement for Scanpy, Squidpy, or domain experts.
+●
+It is not a claim that an LLM can independently establish biological truth.
+●
+It is not initially a foundation-model training project.
+●
+It is not a production clinical decision system.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 3
+●
+It should not be judged only by fluency, task completion, or the number of generated conclusions.
+1.3 Research thesis
+The proposed thesis is that scientific agents should be optimized not only for completing workflows, but also for
+maintaining a defensible relationship between claims and executed evidence. Under degraded conditions, a
+scientifically disciplined agent should become more cautious, expose uncertainty, request additional analysis, or
+escalate to human review instead of preserving a confident narrative at all costs.
+1.4 Research questions
+1
+Does the full BioAgent-ST configuration reduce the rate of unsupported biological claims compared with
+tool-using baselines?
+2
+Does the system increase Indeterminate classifications and human-review escalations as data quality declines?
+3
+Do the evidence ledger, dual-loop critic, uncertainty gating, and provenance constraints each contribute
+measurable value?
+4
+Can an independent researcher reconstruct key numerical results and decision points from the provenance
+ledger alone?
+5
+Does the system preserve useful scientific task completion while becoming more cautious under uncertainty?
+2. Positioning Against Existing Directions
+The internal research brief situates BioAgent-ST relative to spatial and single-cell agentic systems including
+SpatialAgent, STAT, STAgent, ChatSpatial, and CASSIA. The brief identifies overlapping capabilities in tool use,
+interactive analysis, multimodal reasoning, schema enforcement, and annotation uncertainty.
+The proposed distinction is not that existing systems lack all verification. Rather, BioAgent-ST emphasizes a
+specific combination: an active dual-loop architecture, a five-state evidence ledger, uncertainty-gated autonomy,
+and provenance-native generation. These are research hypotheses and design targets that must be checked
+against the latest literature and implementations before being claimed as novel.
+Direction
+Primary emphasis
+Implication for BioAgent-ST
+Spatial analysis agents
+End-to-end analysis and tool orchestration
+Reuse established scientific tools rather than reimplementing them.
+Interactive multi-agent
+pipelines
+Skill modularity, prerequisites, and session
+context
+Use typed skills and explicit prerequisites.
+Schema-enforced
+orchestration
+Deterministic tool selection and parameter
+constraints
+Adopt strict schemas for all scientific operations.
+Annotation uncertainty
+systems
+Consensus or quality scoring
+Extend uncertainty to workflow-level scientific claims.
+Verification-oriented agents
+Claim audits and saved artifacts
+Investigate active mid-workflow intervention and evidence-bound
+reporting.
+Novelty discipline
+Do not assume that a feature is novel because it is absent from an informal comparison. Conduct a systematic
+literature review, inspect released code where available, distinguish post-hoc audits from active intervention,
+and state exactly what is implemented and experimentally tested.
+3. System Architecture
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 4
+3.1 High-level pipeline
+The system is organized as an outer Planner–Executor loop and an inner Verifier–Critic loop. The outer loop
+proposes and executes analysis steps. The inner loop evaluates the resulting artifacts and claims, and can request
+revision, flag a claim, or escalate to human review.
+Layer
+Responsibility
+Primary outputs
+Research interface
+Accept question, dataset, constraints, and user intent
+Validated research request
+Planner
+Convert question into a typed, constrained analysis plan
+Plan object with ordered steps
+Plan validator
+Check prerequisites, tool availability, parameter ranges, and data
+compatibility
+Approved or rejected plan
+Executor
+Run deterministic scientific tools
+Artifacts, metrics, figures, logs
+Provenance layer
+Record lineage, versions, parameters, hashes, and upstream
+dependencies
+Machine-readable provenance records
+Verifier
+Run deterministic checks and evidence validation
+Validation findings
+Critic
+Interpret validation results and challenge unsupported conclusions
+Revision, flag, or escalation decision
+Evidence ledger
+Assign and store claim states
+Evidence records
+Report generator
+Create an evidence-bound narrative and limitations section
+Scientific report
+3.2 Recommended control flow
+1
+Receive and validate the research request.
+2
+Inspect dataset metadata and supported modalities.
+3
+Generate a typed analysis plan.
+4
+Validate the plan against tool schemas and prerequisites.
+5
+Execute the next approved tool.
+6
+Persist outputs and provenance.
+7
+Run deterministic validation checks.
+8
+Create or update evidence records for relevant claims.
+9
+Let the critic decide whether to continue, revise, flag, or escalate.
+10
+Generate a report using only validated evidence and traceable artifacts.
+3.3 Autonomy levels
+Evidence condition
+System behavior
+Required report behavior
+High-quality evidence
+Continue with normal workflow
+Include Supported claims and their evidence
+references.
+Medium-quality evidence
+Continue with constraints or additional checks
+Include caveats, alternatives, and
+Plausible/Hypothesis labels.
+Low or contradictory evidence
+Stop, revise, or escalate
+Use Indeterminate or Unsupported states; request
+human review or additional data.
+Implementation warning
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 5
+The diagram is an architectural target. The first prototype should use a simpler sequential workflow, then add
+active interruption and more advanced autonomy control after the basic provenance and evidence
+mechanisms are reliable.
+4. Recommended Technology Stack
+4.1 Stack overview
+Area
+Recommendation
+Reason
+Language
+Python 3.11 or 3.12
+Common ecosystem for scientific computing, bioinformatics, backend
+services, and evaluation.
+Agent orchestration
+LangGraph or an equivalent explicit state
+graph
+Stateful nodes, conditional routing, persistence, and human-in-the-loop
+patterns.
+Scientific data
+AnnData, NumPy, pandas
+Native representation for expression matrices, observations, variables,
+embeddings, and annotations.
+Single-cell analysis
+Scanpy
+Quality control, normalization, dimensionality reduction, clustering, and marker
+analysis.
+Spatial analysis
+Squidpy
+Spatial graphs, neighborhood analysis, spatial statistics, and visualization.
+Statistics
+SciPy, statsmodels, and task-specific
+methods
+Explicit, inspectable statistical computation.
+Schemas
+Pydantic
+Typed validation for plans, parameters, outputs, claims, and provenance.
+API
+FastAPI
+Python-native API for experiments, status, artifacts, and reports.
+Initial UI
+Streamlit or a minimal frontend
+Fast internal research interface without overbuilding.
+Production UI
+React, if needed later
+Separate interactive frontend after the research core is stable.
+Metadata store
+SQLite initially; PostgreSQL later
+Low operational overhead for local experiments; scalable metadata when
+needed.
+Artifacts
+Local filesystem initially; object storage
+later
+Store H5AD/Zarr, tables, figures, JSON, and logs separately from metadata.
+Experiment tracking
+MLflow or a lightweight versioned
+experiment registry
+Track configurations, metrics, artifacts, and runs.
+Environment
+uv, Docker, pinned dependencies
+Reproducibility and easier collaboration.
+Testing
+pytest, Ruff, type checking
+Protect scientific tools and evaluation code from regressions.
+Version control
+Git and GitHub
+Collaborative development, code review, issues, and reproducibility.
+4.2 Why Python-first
+A Python-first stack minimizes integration overhead because the scientific analysis, data structures, statistics,
+evaluation harness, and orchestration can share one language. A separate Node.js backend is unnecessary for the
+initial research prototype. A frontend can be added after the scientific workflow is stable.
+4.3 What not to add initially
+●
+Kubernetes or a large microservice architecture.
+●
+Redis and asynchronous job infrastructure unless actual concurrency requires them.
+●
+A vector database without a clearly defined retrieval problem.
+●
+Custom foundation-model training.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 6
+●
+A huge library of tools before the first three workflows are reproducible.
+●
+Arbitrary code execution as the default interface to the LLM.
+5. Scientific Analysis Layer
+5.1 Initial workflow scope
+A two-person team should begin with three core workflows. This provides enough scientific depth to test the
+verification architecture without attempting to implement every spatial transcriptomics method.
+Workflow
+Initial capabilities
+Verification focus
+QC and clustering
+Load AnnData, quality control, normalization, feature
+selection, embeddings, clustering
+Input quality, parameter validity, reproducibility,
+cluster stability indicators
+Spatial domains and marker
+evidence
+Spatial organization, marker statistics, spatial plots
+Marker consistency, effect sizes, multiple testing,
+alternative interpretations
+Spatial statistics
+Neighborhood enrichment and selected spatial
+autocorrelation analyses
+Null model, spatial graph validity, statistical
+assumptions, sensitivity analysis
+5.2 Later expansion candidates
+●
+Cell-type annotation and deconvolution.
+●
+Spatially variable gene detection.
+●
+Cell–cell communication inference.
+●
+Multimodal integration with tissue images.
+●
+Cross-platform analysis and transfer.
+●
+Literature-supported hypothesis generation.
+5.3 Scientific guardrails
+●
+A cluster is not automatically a validated cell type.
+●
+A marker association is not automatically causal evidence.
+●
+Spatial proximity is not automatically a biological interaction.
+●
+A statistically significant result is not automatically biologically important.
+●
+A failed statistical test may reflect inadequate power, model mismatch, or data quality rather than biological
+absence.
+●
+The agent must report limitations and assumptions for each analysis method.
+6. Evidence Ledger
+6.1 Five-state claim model
+State
+Operational meaning
+Typical action
+Supported
+Evidence meets predefined quantitative and biological requirements; artifacts
+are present and consistent.
+May appear as a supported conclusion with
+references.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 7
+State
+Operational meaning
+Typical action
+Plausible
+Evidence is directionally consistent but incomplete or borderline; alternatives
+remain viable.
+Include caveats and alternative explanations.
+Hypothesis
+Reasonable extrapolation not directly supported by current analysis.
+Present explicitly as a hypothesis, not a
+finding.
+Unsupported
+Available evidence contradicts or fails to support the claim.
+Do not present as a supported result; explain
+the basis.
+Indeterminate
+Data quality, power, design, or ambiguity prevents a decisive judgment.
+Escalate, request additional analysis, or
+recommend human review.
+6.2 Proposed Pydantic model
+from datetime import datetime from typing import Literal from pydantic import BaseModel, Field
+EvidenceState = Literal[ "supported", "plausible", "hypothesis", "unsupported", "indeterminate", ]
+class EvidenceRecord(BaseModel): evidence_id: str experiment_id: str claim_id: str state: EvidenceState
+claim: str supporting_artifacts: list[str] contradicting_artifacts: list[str] = [] validation_checks:
+list[str] limitations: list[str] = [] confidence: float | None = Field( default=None, ge=0.0, le=1.0 )
+provenance_ids: list[str] created_at: datetime
+6.3 Confidence versus evidence
+An LLM's self-reported confidence is not equivalent to a calibrated statistical probability. The implementation
+should separate categorical evidence state, statistical evidence, empirical calibration, and reasons for uncertainty.
+A numerical confidence field may be stored, but it should not be interpreted as statistically meaningful until
+calibrated and evaluated.
+7. Provenance-Native Design
+Every intermediate object should carry a machine-readable provenance record. The minimum record should allow
+another researcher to identify the dataset, code version, tool version, parameters, random seed, timestamp,
+upstream objects, and output location.
+7.1 Proposed provenance schema
+class ProvenanceRecord(BaseModel): artifact_id: str artifact_type: str dataset_hash: str code_commit:
+str tool_name: str tool_version: str parameters: dict random_seed: int | None upstream_artifact_ids:
+list[str] output_uri: str created_at: datetime
+7.2 Example artifact
+Field
+Illustrative value
+artifact_id
+art_cluster_001
+artifact_type
+clustering_result
+dataset_hash
+sha256:
+code_commit
+a1b2c3d
+tool_name
+scanpy
+parameters
+method=leiden; resolution=0.5; random_state=42
+upstream_artifact_ids
+art_qc_001; art_normalization_001
+7.3 Storage model
+●
+Metadata database: experiments, claims, evidence records, provenance records, statuses, and references.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 8
+●
+Artifact directory: H5AD/Zarr datasets, CSV tables, JSON outputs, figures, logs, and generated reports.
+●
+Version control: source code, experiment configurations, schemas, and documentation.
+●
+Dataset manifests: source, license, version, checksum, preprocessing steps, and access notes.
+Core constraint
+A report generator should not be free to invent numerical results. Claims should be linked to evidence records,
+and evidence records should point to validated artifacts and provenance entries.
+8. Typed Scientific Tools and Execution Safety
+The first implementation should expose controlled scientific tools rather than allowing unrestricted Python
+generation and execution. Typed tool interfaces improve validation, reproducibility, observability, and error
+handling.
+class QCParams(BaseModel): min_genes: int = 200 max_mito_pct: float = 20.0 def run_qc( dataset_path:
+str, params: QCParams, ) -> dict: """ Execute a predefined QC workflow. Return references to validated
+artifacts. """ # Load dataset # Apply validated QC operations # Save outputs # Create provenance record
+# Return structured result ...
+Each tool should define:
+●
+Typed input parameters and allowed ranges.
+●
+Prerequisites and supported data modalities.
+●
+Expected output schema.
+●
+Validation checks.
+●
+Artifact paths and provenance entries.
+●
+Error behavior and partial-failure handling.
+●
+Random seed behavior where relevant.
+Arbitrary code execution may be studied later, but it should not be the default execution mechanism in the first
+research prototype.
+9. LLM and Agent Layer
+Use one model with explicit state transitions before introducing multiple independent LLM agents. The research
+value comes from the control architecture and evidence discipline, not from multiplying agent personas.
+Task
+LLM role
+Deterministic or external role
+Workflow selection
+Suggest an appropriate supported workflow
+Validate dataset compatibility and prerequisites
+Parameter proposal
+Propose parameters within schema
+Enforce ranges and defaults
+Execution
+Select an approved tool
+Run Scanpy, Squidpy, and statistical code
+Claim interpretation
+Explain evidence and alternatives
+Calculate statistics and check artifacts
+Verification
+Help classify or critique claims
+Apply deterministic validation and provenance checks
+Report writing
+Produce readable narrative
+Restrict claims to evidence-backed records
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 9
+9.1 Provider abstraction
+class LLMClient(Protocol): def generate_plan( self, question: str, context: dict ) -> dict: ... def
+evaluate_claim( self, claim: dict, evidence: dict ) -> dict: ...
+A provider abstraction allows testing local models through Ollama, hosted models, or multiple model configurations
+without rewriting the orchestration system. Model identity, prompt templates, temperature, tool schemas, and
+version information should be recorded as part of experiment metadata.
+10. Two-Person Team Structure
+10.1 Suggested ownership
+Owner
+Primary responsibilities
+Shared responsibilities
+Teammate A: Agent architecture
+and evaluation
+Planner–Executor graph, Verifier–Critic, evidence ledger,
+provenance constraints, experiment runner, metrics, LLM
+integration
+Research questions, literature review,
+baseline design, paper writing
+Teammate B: Scientific computation
+and data
+AnnData/Scanpy/Squidpy workflows, ingestion, validation,
+statistics, artifacts, benchmark datasets
+Research questions, literature review,
+baseline design, paper writing
+10.2 Shared minimum knowledge
+●
+Spatial transcriptomics fundamentals.
+●
+AnnData structure and common data modalities.
+●
+Quality control, normalization, clustering, marker analysis, and spatial statistics.
+●
+Basic statistical reasoning, multiple testing, uncertainty, and power.
+●
+Git, testing, reproducible environments, and experiment documentation.
+●
+Research methodology: baselines, ablations, error analysis, and limitations.
+Team principle
+Avoid a split where one person only builds the interface and the other only builds the backend. Both team
+members should understand the scientific assumptions and evaluation protocol well enough to reproduce and
+challenge the results.
+11. Research Evaluation Framework
+11.1 Baselines
+The research brief proposes comparisons against tool-using and multi-agent configurations. The exact baselines
+should be chosen based on reproducibility, availability of open components, and fair matching of tools and tasks.
+Configuration
+Description
+Purpose
+Tool-using baseline
+Planner and executor with scientific tools but without the full
+verification architecture
+Estimate the value of verification
+mechanisms.
+Schema-constrained baseline
+Typed tools and parameter checks without active claim-level
+verification
+Separate schema reliability from scientific
+verification.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 10
+Configuration
+Description
+Purpose
+ReAct-style baseline
+Strong tool-using agent with less structured control
+Compare against a less constrained
+orchestration pattern.
+Full BioAgent-ST
+Ledger, critic, uncertainty gating, and provenance constraints
+Evaluate the complete proposed system.
+11.2 Ablations
+Configuration
+Ledger
+Critic
+Gating
+Provenance constraints
+Full system
+Yes
+Yes
+Yes
+Yes
+No ledger
+No
+Yes
+Yes
+Yes
+No critic
+Yes
+No
+Yes
+Yes
+No gating
+Yes
+Yes
+No
+Yes
+No provenance constraints
+Yes
+Yes
+Yes
+No
+11.3 Controlled degradation
+●
+Technical noise or gene dropout.
+●
+Reduced cell or spot counts.
+●
+Platform-shift pairs where scientifically defensible.
+●
+Low-replicate settings.
+●
+Biologically ambiguous questions.
+●
+Perturbations that affect statistical power or data completeness.
+Degradation experiments must be documented carefully. Synthetic perturbations should be justified, reproducible,
+and distinguished from naturally occurring data-quality problems. The same scientific question should be evaluated
+across a controlled degradation continuum.
+11.4 Primary metrics
+Metric
+Definition / purpose
+Unsupported-claim rate
+Fraction of evaluated biological assertions judged unsupported by independent review or a validated
+provenance-replay procedure.
+Supported-claim precision
+Fraction of claims labeled Supported that satisfy predefined evidence criteria.
+Graceful-degradation response
+Change in Indeterminate or human-review behavior as data quality declines.
+Auditability
+Fraction of key numerical results and decision points reconstructible from the ledger.
+Task utility
+Ability to complete valid scientific tasks when evidence is sufficient.
+Human review quality
+Structured judgments of trustworthiness, usefulness, and clarity from qualified reviewers.
+Avoid the refusal trap
+A system that refuses every task can achieve a low unsupported-claim rate but has poor scientific utility.
+Evaluation must reward both reliable Supported claims and appropriate completion when evidence is
+sufficient.
+12. Implementation Roadmap
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 11
+A realistic initial target is approximately 12–16 weeks for a meaningful research prototype, depending on weekly
+availability, existing skills, dataset access, and the amount of scientific review required. This is a planning estimate
+rather than a guarantee.
+Period
+Milestone
+Deliverables
+Weeks 1–2
+Research and foundations
+Literature matrix, dataset selection, repo, environment, schemas, initial research
+questions.
+Weeks 3–4
+Deterministic analysis layer
+QC and clustering tools, input validation, figures, artifacts, provenance capture,
+tests.
+Weeks 5–6
+First working agent
+Typed plans, planner, executor graph, sequential workflow, initial report.
+Weeks 7–8
+Verification and ledger
+Five-state evidence ledger, deterministic checks, critic routing, escalation
+transitions.
+Weeks 9–10
+Evaluation harness
+Task suite, baseline configurations, degradation pipeline, metrics, experiment
+logging.
+Weeks 11–12+
+Experiments and paper
+Baseline results, ablations, error analysis, limitations, manuscript draft,
+reproducibility package.
+12.1 First milestone
+Minimum viable research prototype
+A user asks a question about a provided AnnData dataset. The system executes a predefined analysis
+workflow, records artifacts and provenance, evaluates one or two scientific claims using explicit rules, and
+generates a report with evidence references.
+If the team can complete this milestone reproducibly, it has a credible foundation for the full dual-loop architecture.
+Do not begin with a large autonomous system before this foundation works.
+13. Repository and Engineering Organization
+bioagent-st/ ■■■ apps/ ■ ■■■ api/ ■ ■ ■■■ main.py ■ ■■■ ui/ ■■■ src/ ■ ■■■ bioagent_st/ ■ ■■■
+agents/ ■ ■ ■■■ planner.py ■ ■ ■■■ executor.py ■ ■ ■■■ verifier.py ■ ■ ■■■ critic.py ■ ■■■
+analysis/ ■ ■ ■■■ qc.py ■ ■ ■■■ clustering.py ■ ■ ■■■ spatial.py ■ ■ ■■■ statistics.py ■ ■■■
+schemas/ ■ ■ ■■■ plans.py ■ ■ ■■■ evidence.py ■ ■ ■■■ provenance.py ■ ■■■ ledger/ ■ ■ ■■■
+evidence_store.py ■ ■ ■■■ provenance_store.py ■ ■■■ evaluation/ ■ ■ ■■■ metrics.py ■ ■ ■■■
+baselines.py ■ ■ ■■■ degradation.py ■ ■■■ reporting/ ■ ■■■ generator.py ■■■ tests/ ■ ■■■ unit/ ■
+■■■ integration/ ■ ■■■ evaluation/ ■■■ experiments/ ■ ■■■ configs/ ■ ■■■ results/ ■■■ data/ ■ ■■■
+README.md ■ ■■■ manifests/ ■■■ docker/ ■■■ notebooks/ ■■■ pyproject.toml ■■■ README.md
+13.1 Engineering rules
+1
+Scientific computation must not depend on an LLM response to be reproducible.
+2
+Every scientific tool must have input, output, and regression tests.
+3
+Raw datasets must be separated from generated artifacts.
+4
+Experiment configurations must be version-controlled.
+5
+Exploratory notebooks should not be the only location of production analysis logic.
+6
+Every result used in a report must be traceable to a recorded artifact.
+7
+Model prompts, model identifiers, tool versions, and execution settings must be logged.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 12
+14. Learning Requirements
+14.1 Engineering and AI
+●
+Python, OOP, typing, and data validation.
+●
+NumPy, pandas, and basic statistics.
+●
+FastAPI, pytest, logging, and error handling.
+●
+State-machine or graph-based orchestration.
+●
+Git, Docker, environment pinning, and reproducible execution.
+●
+Experiment design, baseline comparisons, ablations, and error analysis.
+14.2 Spatial transcriptomics fundamentals
+●
+What spatial transcriptomics measures and how spatial coordinates relate to expression.
+●
+Spot-based versus cell-resolved platforms.
+●
+AnnData fields: X, obs, var, obsm, uns, layers, and spatial metadata.
+●
+Quality control, normalization, dimensionality reduction, and clustering.
+●
+Marker genes, cell-type annotation, spatial domains, and neighborhood analysis.
+●
+Statistical significance, effect sizes, multiple testing, and biological interpretation.
+●
+Batch effects, sparsity, technical artifacts, platform shift, and low statistical power.
+14.3 Suggested learning strategy
+Learn the minimum scientific concepts needed to understand each workflow while implementing it. Avoid spending
+months studying every area of computational biology before writing code, but also avoid treating biology as a thin
+wrapper around an LLM. Each implemented method should have a short internal technical note explaining
+assumptions, inputs, outputs, limitations, and validation checks.
+15. Research Paper Development
+15.1 Working title
+Verification-First Agentic Spatial Transcriptomics Analysis: Evidence Ledgers,
+Uncertainty-Gated Autonomy, and Provenance-Native Reporting
+15.2 Suggested paper structure
+Section
+Content
+Abstract
+Problem, system contribution, evaluation setting, primary findings, limitations.
+Introduction
+Scientific reliability problem, motivation, research question, contributions.
+Related work
+Spatial transcriptomics agents, scientific agents, uncertainty, provenance, trustworthy AI.
+Research questions and hypotheses
+Precise claims that can be tested experimentally.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 13
+Section
+Content
+System design
+Architecture, typed tools, evidence ledger, verification, gating, provenance.
+Experimental setup
+Datasets, tasks, baselines, ablations, degradation protocol, review process.
+Results
+Metrics, confidence intervals where appropriate, comparisons, ablations, error analysis.
+Limitations
+Data scope, biological assumptions, evaluator subjectivity, model dependence, compute.
+Conclusion
+Only evidence-supported conclusions and future work.
+15.3 Claims discipline
+●
+Do not claim novelty before reviewing the latest relevant literature.
+●
+Do not call an approximation a reproduction of an external system.
+●
+Do not equate successful tool execution with scientific validity.
+●
+Do not treat LLM confidence as calibrated probability without evidence.
+●
+Report negative results and failure cases.
+●
+Separate observed results, design intentions, hypotheses, and future work.
+16. Risks and Mitigations
+Risk
+Why it matters
+Mitigation
+Scope explosion
+Too many workflows and platforms can prevent
+completion.
+Start with three workflows and expand only after
+reproducibility.
+Weak biological grounding
+The agent may produce plausible but scientifically
+invalid interpretations.
+Use deterministic checks, domain review, explicit
+limitations, and conservative claim states.
+Unrestricted code execution
+Security, side effects, and poor reproducibility.
+Typed tools, isolated environments, and controlled
+artifacts.
+Metric gaming
+Optimizing refusal can reduce unsupported claims
+while destroying utility.
+Measure Supported precision, task utility, and
+escalation appropriateness together.
+Novelty overclaim
+Existing systems may already implement similar
+mechanisms.
+Systematic review, precise positioning, honest
+comparison.
+Data leakage or contamination
+Evaluation results may become unreliable.
+Version datasets, document splits, and separate
+development from held-out tests.
+Reviewer subjectivity
+Claim support judgments may vary.
+Predefine annotation guidelines, use multiple
+reviewers where possible, report agreement.
+Reproducibility failures
+Results cannot be reconstructed.
+Pin environments, hash datasets, store seeds, log
+artifacts, and test replay.
+Model dependence
+Results may be specific to one LLM.
+Evaluate multiple configurations where resources
+allow and log model details.
+17. Build Checklist
+17.1 Before coding
+●
+Agree on one precise research question.
+●
+Select the first three workflows.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 14
+●
+Choose datasets and document licenses and access.
+●
+Create a literature matrix and novelty map.
+●
+Define evidence states and initial validation rules.
+●
+Agree on ownership, branching strategy, and experiment naming.
+17.2 Before running experiments
+●
+Confirm deterministic tools work without an LLM.
+●
+Confirm provenance records are generated automatically.
+●
+Confirm reports cannot reference missing artifacts.
+●
+Write the baseline and ablation configurations.
+●
+Define the evaluation metrics and review protocol.
+●
+Test the degradation pipeline on small datasets.
+17.3 Before writing the paper
+●
+Freeze the evaluation protocol before final runs.
+●
+Record all software versions and model configurations.
+●
+Perform error analysis, not only aggregate metrics.
+●
+Document unsupported, indeterminate, and failed cases.
+●
+Separate exploratory results from confirmatory comparisons.
+●
+Prepare a reproducibility package containing code, configurations, and documentation.
+18. Final Strategic Guidance
+The strongest version of BioAgent-ST is not the one with the largest number of tools, the most complicated
+multi-agent architecture, or the most visually impressive interface. It is the one that can make a precise scientific
+claim about reliability and support that claim with controlled experiments.
+For a two-person team, the recommended strategy is to build a narrow but rigorous vertical slice: one or two
+datasets, three workflows, typed tools, a provenance layer, a five-state evidence ledger, and a minimal report
+generator. Once that slice is reproducible, add the active critic, uncertainty gating, degradation experiments, and
+baseline comparisons.
+North-star principle
+Build a system that knows what it executed, knows what evidence it has, distinguishes findings from
+hypotheses, exposes uncertainty, and can be audited by someone who was not present during the run.
+A publishable paper will depend on what the experiments demonstrate—not simply on the elegance of the
+architecture. Treat every design decision as a hypothesis to test, every biological conclusion as evidence-bound,
+and every limitation as part of the scientific contribution.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 15
+Appendix A. Reference Data Contracts
+A.1 Minimal analysis plan
+class AnalysisStep(BaseModel): step_id: str tool_name: str purpose: str parameters: dict
+input_artifact_ids: list[str] expected_outputs: list[str] prerequisites: list[str] class
+AnalysisPlan(BaseModel): plan_id: str research_question: str dataset_id: str steps: list[AnalysisStep]
+constraints: list[str] created_by_model: str created_at: datetime
+A.2 Minimal claim contract
+class ClaimRecord(BaseModel): claim_id: str experiment_id: str text: str claim_type: str
+evidence_state: EvidenceState evidence_ids: list[str] provenance_ids: list[str] limitations: list[str]
+requires_human_review: bool
+A.3 Report constraints
+●
+Every quantitative statement must reference an artifact or validated evidence record.
+●
+Every biological conclusion must have an evidence state.
+●
+Every uncertainty statement must identify its reason.
+●
+Unsupported or Indeterminate claims must not be silently rewritten as findings.
+●
+The report should list data, software, parameters, and limitations.
+Appendix B. Suggested Initial Deliverables
+Deliverable
+Definition of done
+Literature matrix
+Relevant systems, capabilities, limitations, code availability, and exact positioning.
+Dataset manifest
+Source, version, license, checksum, modality, preprocessing, and known limitations.
+Scientific tool package
+Typed tools with tests, documented assumptions, and reproducible artifacts.
+Evidence ledger
+Persistent five-state records linked to claims, artifacts, and provenance.
+Agent graph
+Planner, validator, executor, verifier, critic, and decision routing.
+Evaluation harness
+Baselines, ablations, degradation variants, metrics, and experiment configs.
+Reproducibility package
+Pinned environment, code, configs, manifests, and instructions.
+Paper draft
+Methods and evaluation written before final results are interpreted.
+Appendix C. Source and Status Note
+This blueprint is based on the BioAgent-ST Research Brief supplied for the project and the implementation
+recommendations developed in the accompanying discussion. The architecture, schemas, technology choices,
+roadmap, and experimental recommendations are proposed designs. They are not evidence that the system has
+already been implemented or that any research hypothesis has been confirmed.
+Before external publication, the team should verify all related-work descriptions, update citations, confirm software
+versions, and revise the novelty statement based on the latest available literature and released systems.
+
+
+BIOAGENT-ST
+Research & Implementation Blueprint
+Prepared for collaborative research development
+Page 16
+End of document.

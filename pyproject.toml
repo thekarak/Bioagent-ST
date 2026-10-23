@@ -1,0 +1,69 @@
+[project]
+name = "bioagent-st"
+version = "0.1.0"
+description = "Verification-first scientific agent for spatial transcriptomics"
+readme = "README.md"
+authors = [
+    { name = "Sourasis Karak", email = "sforsourasis@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "anndata",
+    "fastapi",
+    "igraph>=1.0.0",
+    "langgraph",
+    "leidenalg>=0.12.0",
+    "numpy",
+    "pandas",
+    "pydantic",
+    "pyyaml",
+    "scanpy",
+    "scipy",
+    "squidpy",
+    "statsmodels",
+    "uvicorn",
+]
+
+[project.scripts]
+bioagent-st = "bioagent_st.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.8",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+    "slow: tests using larger datasets or expensive analyses",
+    "llm: tests that call a real language model",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["_blueprint_extracted.txt"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["_blueprint_extracted.txt"]
+
+[[tool.mypy.overrides]]
+module = ["squidpy.*", "scanpy.*", "anndata.*", "scipy.*", "pandas.*", "yaml.*"]
+ignore_missing_imports = true

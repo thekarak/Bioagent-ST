@@ -1,0 +1,23 @@
+{
+  "dataset_id": "libd_dlpfc_151507_v2",
+  "source": "Varrone, Marco (2023), Figshare",
+  "source_url": "https://doi.org/10.6084/m9.figshare.22004273.v2",
+  "version": "2",
+  "license": "CC BY 4.0",
+  "sha256": "sha256:fd588ae557dd16d0940600676a2fa0a45718696eab233197aec44140f0046315",
+  "modality": "visium",
+  "platform": "10x Genomics Visium",
+  "preprocessing_state": "preprocessed integer-like expression matrix",
+  "known_limitations": [
+    "Human postmortem DLPFC section; not a disease-treatment experiment",
+    "Layer labels are study annotations, not cell-type identity claims",
+    "Spatial proximity does not establish interaction"
+  ],
+  "tissue": "dorsolateral prefrontal cortex",
+  "organism": "Homo sapiens",
+  "label_columns": [
+    "sce.layer_guess"
+  ],
+  "citation": "Maynard et al. (2021), doi:10.1038/s41593-020-00787-0",
+  "notes": "Downloaded but never committed; reproduce with scripts/download_dlpfc.py"
+}

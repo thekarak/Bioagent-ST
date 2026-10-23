@@ -1,0 +1,24 @@
+{
+  "dataset_id": "synthetic_spatial_300x500",
+  "source": "BioAgent-ST deterministic generator",
+  "source_url": null,
+  "version": "1.0.0",
+  "license": "CC0-1.0",
+  "sha256": "sha256:f7672ad7a49be5f3ca08b2050a42be8b7cc3db4fd99722fa2b92e2861b8f0322",
+  "modality": "generic_spatial",
+  "platform": "synthetic_grid",
+  "preprocessing_state": "raw integer-like counts",
+  "known_limitations": [
+    "Synthetic data for software testing only",
+    "Spatial domains are planted ground truth and not biological evidence",
+    "Marker genes are planted and do not represent real biology"
+  ],
+  "parent_dataset_id": null,
+  "perturbation": null,
+  "seed": 0,
+  "notes": "Regenerate with `uv run python -m bioagent_st.make_fixture`.",
+  "tissue": null,
+  "organism": null,
+  "label_columns": [],
+  "citation": null
+}
