@@ -30,6 +30,7 @@ import { useHashRouter, isRouteActive, APP_ROUTES } from "@/lib/bioagent/router"
 import { useBioAgentStore } from "@/lib/bioagent/store";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "./CommandPalette";
+import { checkBackendHealth } from "@/lib/bioagent/api";
 
 const NAV_ITEMS = [
   { label: "Overview", route: APP_ROUTES.overview, icon: LayoutDashboard },
@@ -42,7 +43,7 @@ const NAV_ITEMS = [
   { label: "Settings", route: APP_ROUTES.settings, icon: Settings },
 ];
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, backendOnline }: { onNavigate?: () => void; backendOnline?: boolean | null }) {
   const { path, navigate } = useHashRouter();
   const activeRunId = useBioAgentStore((s) => s.activeRunId);
 
@@ -97,26 +98,48 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </ul>
       </nav>
       <div className="border-t border-border p-3">
-        <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
-            <FlaskConical className="size-3.5" aria-hidden />
-            Demo Mode
-          </p>
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-            All datasets, runs and results are illustrative and generated locally in your browser. No
-            scientific backend is connected.
-          </p>
-        </div>
+        {backendOnline ? (
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="size-2 rounded-full bg-emerald-500" />
+              Scientific Backend Live
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Connected to localhost:8000. Verified workflows, deterministic tools, and SQLite ledger are active.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+              <FlaskConical className="size-3.5" aria-hidden />
+              Demo Mode
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              All datasets, runs and results are illustrative in-browser demo data. Run backend on :8000 for live execution.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function DemoModeIndicator() {
+function BackendStatusIndicator({ online }: { online: boolean | null }) {
+  if (online) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
+        title="Connected to BioAgent-ST scientific backend (http://localhost:8000)"
+      >
+        <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+        Backend Live
+      </span>
+    );
+  }
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] font-medium text-warning"
-      title="Demo Mode: illustrative local data; no scientific backend connected"
+      title="Demo Mode: illustrative local data; backend not connected"
     >
       <FlaskConical className="size-3" aria-hidden />
       Demo Mode
@@ -128,7 +151,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { path, navigate } = useHashRouter();
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [paletteOpen, setPaletteOpen] = React.useState(false);
+  const [backendOnline, setBackendOnline] = React.useState<boolean | null>(null);
   const dataset = useBioAgentStore((s) => s.dataset);
+  const syncBackendDatasets = useBioAgentStore((s) => s.syncBackendDatasets);
+  const loadBackendRuns = useBioAgentStore((s) => s.loadBackendRuns);
+
+  React.useEffect(() => {
+    checkBackendHealth().then((online) => {
+      setBackendOnline(online);
+      if (online) {
+        syncBackendDatasets();
+        loadBackendRuns();
+      }
+    });
+  }, [syncBackendDatasets, loadBackendRuns]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -152,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-border bg-sidebar lg:block">
-        <SidebarContent />
+        <SidebarContent backendOnline={backendOnline} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -166,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+              <SidebarContent onNavigate={() => setMobileNavOpen(false)} backendOnline={backendOnline} />
             </SheetContent>
           </Sheet>
 
@@ -232,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Kbd>Ctrl K</Kbd>
               </span>
             </Button>
-            <DemoModeIndicator />
+            <BackendStatusIndicator online={backendOnline} />
           </div>
         </header>
 
