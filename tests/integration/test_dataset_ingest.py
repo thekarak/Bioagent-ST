@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from anndata import AnnData
 
-from bioagent_st.datasets import inspect_h5ad, load_dataset
+from bioagent_st.datasets import REAL_DLPFC_PATH, inspect_h5ad, load_dataset
 from bioagent_st.fixtures import create_spatial_fixture
 
 
@@ -62,6 +62,9 @@ def test_user_source_requires_path() -> None:
 
 
 def test_real_source_is_available_from_project_layout() -> None:
+    if not REAL_DLPFC_PATH.is_file():
+        pytest.skip(f"real DLPFC data not present at {REAL_DLPFC_PATH}")
+
     adata = load_dataset("real_dlpfc")
 
     assert isinstance(adata, AnnData)
