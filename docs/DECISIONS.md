@@ -1,3 +1,10 @@
+## 2026-10-23 — Canonical workflow contracts and routing architecture
+
+- **Context:** The system required explicit execution boundaries for research queries, request intent classification, and integration between the web frontend and deterministic scientific backend.
+- **Decision:** Restrict execution strictly to three canonical workflows (`quality_assessment`, `spatial_clustering`, `gene_expression`). Route research queries deterministically via transparent keyword rules with Laya LLM classifier fallback. Expose typed REST API endpoints (`/health`, `/api/workflows`, `/api/datasets`, `/api/select`, `/api/runs`) with CORS for web frontend consumption while persisting all run provenance and rule-evaluated claims in SQLite.
+- **Alternatives:** Arbitrary code execution or ad-hoc tool calling (rejected due to safety, non-determinism, and reproducibility non-negotiables); frontend-only demo simulation (rejected because the research prototype requires real deterministic execution).
+- **Consequences:** Requests outside approved workflows abstain (`unsupported_or_ambiguous`); frontend can run against both local mock and real scientific backend without code duplication.
+
 ## 2026-09-25 — Real-first dataset policy and second DLPFC section
 
 - **Context:** The user correctly challenged reliance on synthetic data. The project already had one real DLPFC section; a second section enables basic cross-section real-data checks.

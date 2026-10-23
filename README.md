@@ -67,6 +67,42 @@ The real development datasets are the CC BY 4.0 DLPFC Visium `151507` and `15167
 
 User inputs must be `.h5ad` files and must provide `obsm['spatial']` with finite numeric coordinates. The CLI reports structural errors and exits non-zero rather than passing an invalid dataset downstream.
 
+### Approved canonical workflows
+
+BioAgent-ST restricts analysis to three machine-readable, contract-governed workflows:
+
+1. **`quality_assessment`**: Checks dataset schema, dimensions, sequencing depth, and mitochondrial fraction without modifying underlying counts. Writes `qc.h5ad`, `qc_table.csv`, `schema_report.json`, and `manifest.json`.
+2. **`spatial_clustering`**: Matrix-size-aware normalization, PCA, neighborhood graph, Leiden clustering, UMAP embedding, and spatial spot mapping. Writes `clustered.h5ad`, `cluster_table.csv`, `umap_coords.csv`, `spatial_clusters.png`, and `manifest.json`.
+3. **`gene_expression`**: Resolves gene queries with exact matching and candidate suggestion (rejects ambiguous substitutions), checks layer validity, and computes spatial Moran's I autocorrelation. Writes `gene_match_report.csv`, `expression_summary.csv`, `expression_values.csv`, `spatial_expression.png`, and `spatial_autocorr.csv`.
+
+```powershell
+uv run bioagent-st run-workflow quality_assessment --source synthetic --output artifacts/qc01
+uv run bioagent-st run-workflow spatial_clustering --source synthetic --output artifacts/sc01
+uv run bioagent-st run-workflow gene_expression --source synthetic --genes GENE_0000 --output artifacts/ge01
+```
+
+### Routing evaluation (Rules vs Laya)
+
+Evaluate accuracy, abstention rate, latency, and error rate across the standardized routing benchmark:
+
+```powershell
+# Run with mock predictor for CI / fast local verification
+uv run python scripts/evaluate_routing.py
+
+# Run with real Laya checkpoint (requires `uv sync --extra laya`)
+uv run python scripts/evaluate_routing.py --real
+```
+
+### Run the FastAPI backend service
+
+Start the REST API for web frontend integration:
+
+```powershell
+uv run uvicorn apps.api.main:app --reload --port 8000
+```
+
+Endpoints include `/health`, `/api/workflows`, `/api/datasets`, `/api/select`, and `/api/runs`.
+
 ### Run the sequential MVP agent
 
 The default test-safe path uses `MockLLMClient`; real Ollama is an explicit provider adapter for later evaluation runs.

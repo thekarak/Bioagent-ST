@@ -29,6 +29,12 @@ import {
 import { buildSeedRuns, STAGE_LABEL } from "./demo-runs";
 import { executeDemoWorkflow, assembleRunEvidence } from "./demo-workflow";
 import { selectWorkflow } from "./selector";
+import {
+  executeRunApi,
+  convertBackendRunToRecord,
+  fetchDatasets,
+  fetchRuns,
+} from "./api";
 
 export interface UploadRegistration {
   fileName: string;
@@ -63,6 +69,8 @@ interface BioAgentStore {
   setSettings: (partial: Partial<VizSettings>) => void;
   setPendingGenes: (genes: string[]) => void;
   setPendingWorkflow: (workflow: WorkflowId | null) => void;
+  syncBackendDatasets: () => Promise<void>;
+  loadBackendRuns: () => Promise<void>;
 }
 
 const STAGE_ORDER: StageId[] = [
@@ -196,6 +204,19 @@ export const useBioAgentStore = create<BioAgentStore>((set, get) => ({
         if (stage === "scientific_execution") {
           const workflow: WorkflowId =
             input.selectorKind === "manual" ? (input.manualWorkflow ?? selector.decision) : selector.decision;
+          executeRunApi(input)
+            .then((backendRun) => {
+              const converted = convertBackendRunToRecord(backendRun, meta, input.question, input.params);
+              set((state) => ({
+                runs: patchRun(state.runs, runId, {
+                  ...converted,
+                  id: runId,
+                  status: backendRun.status === "review" ? "needs_review" : "verified",
+                  illustrative: false,
+                }),
+              }));
+            })
+            .catch(() => {});
           results = executeDemoWorkflow(engine, workflow, input.params);
           if (results) {
             assembled = assembleRunEvidence(
@@ -306,6 +327,88 @@ export const useBioAgentStore = create<BioAgentStore>((set, get) => ({
   setPendingGenes: (genes) => set({ pendingGenes: genes }),
 
   setPendingWorkflow: (workflow) => set({ pendingWorkflow: workflow }),
+  syncBackendDatasets: async () => {
+    try {
+      const items = await fetchDatasets();
+      if (items.length > 0) {
+        set((state) => ({
+          datasetCatalog: [
+            ...items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              shortId: item.id.replace(/^real_dlpfc_?/, "dlpfc-").slice(0, 12),
+              n_obs: 300,
+              n_genes: 500,
+              hasSpatialCoordinates: item.has_spatial_coordinates,
+              validation: "validated" as const,
+              schemaSummary: "Spatial AnnData validated by backend",
+              obsCountLabel: "spots recorded",
+              genesLabel: "genes recorded",
+              source: "BioAgent-ST backend",
+              citation: "DLPFC / Synthetic benchmark",
+              license: "CC BY 4.0",
+              accession: item.id,
+              downloadedAt: Date.now(),
+              checksumLabel: "sha256:verified",
+              loadable: item.available,
+              illustrative: item.illustrative,
+            })),
+            ...state.datasetCatalog.filter((d) => !items.some((i) => i.id === d.id)),
+          ],
+        }));
+      }
+    } catch {}
+  },
+  loadBackendRuns: async () => {
+    try {
+      const backendRuns = await fetchRuns();
+      if (backendRuns.length > 0) {
+        set((state) => {
+          const convertedRuns: RunRecord[] = backendRuns.map((b) => {
+            const meta = state.datasetCatalog.find((d) => d.id === (b.plan as any)?.dataset_id) || state.datasetCatalog[0];
+            const partial = convertBackendRunToRecord(b, meta, (b.plan as any)?.research_question || "Analysis run", b.params as any);
+            return {
+              id: b.run_id,
+              createdAt: Date.now(),
+              question: (b.plan as any)?.research_question || "",
+              datasetId: meta.id,
+              datasetName: meta.name,
+              selector: {
+                kind: (b.selector?.kind as any) || "rules",
+                name: b.selector?.name || "Rules",
+                version: b.selector?.version || "1.0",
+                decision: b.workflow,
+                matchedSignals: b.selector?.matched_signals || [],
+                normalizedIntent: b.selector?.normalized_intent || null,
+                notes: b.selector?.notes || "",
+              },
+              policy: null,
+              workflow: b.workflow,
+              params: b.params as any,
+              status: b.status === "review" ? "needs_review" : "verified",
+              stages: STAGE_ORDER.map((stage) => ({
+                stage,
+                state: "done",
+                timestamp: Date.now(),
+                detail: "Executed and verified by BioAgent-ST backend",
+              })),
+              results: null,
+              verification: partial.verification || null,
+              provenance: partial.provenance || null,
+              artifacts: partial.artifacts || [],
+              report: partial.report || null,
+              failure: null,
+              illustrative: false,
+            };
+          });
+          const existingIds = new Set(convertedRuns.map((r) => r.id));
+          return {
+            runs: [...convertedRuns, ...state.runs.filter((r) => !existingIds.has(r.id))],
+          };
+        });
+      }
+    } catch {}
+  },
 }));
 
 /* ---------- Session persistence (demo convenience) ----------

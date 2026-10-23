@@ -38,7 +38,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inspect.add_argument("--dataset", type=Path)
     workflow = subparsers.add_parser("run-workflow")
-    workflow.add_argument("workflow", choices=("qc_clustering", "markers", "spatial_statistics"))
+    workflow.add_argument(
+        "workflow",
+        choices=(
+            "quality_assessment",
+            "spatial_clustering",
+            "gene_expression",
+            "qc_clustering",
+            "markers",
+            "spatial_statistics",
+        ),
+    )
     workflow.add_argument(
         "--source",
         choices=("real_dlpfc", "real_dlpfc_151673", "synthetic", "user"),
@@ -46,6 +56,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     workflow.add_argument("--dataset", type=Path)
     workflow.add_argument("--output", type=Path, required=True)
+    workflow.add_argument("--genes", nargs="+")
+    workflow.add_argument("--layer", default="X")
+    workflow.add_argument("--min-genes", type=int, default=200)
+    workflow.add_argument("--min-counts", type=int, default=500)
     agent = subparsers.add_parser("run-agent")
     agent.add_argument(
         "--source",
@@ -57,6 +71,14 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--question", required=True)
     agent.add_argument("--experiment-id", default="experiment_local")
     agent.add_argument("--output", type=Path, required=True)
+    agent.add_argument("--selector", choices=("rules", "laya", "manual"), default="rules")
+    agent.add_argument(
+        "--workflow",
+        choices=("quality_assessment", "spatial_clustering", "gene_expression"),
+    )
+    agent.add_argument("--genes", nargs="+")
+    agent.add_argument("--layer", default="X")
+    agent.add_argument("--params-json")
     return parser
 
 

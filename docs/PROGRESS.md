@@ -2,6 +2,23 @@
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
 
+## 2026-10-23 — Canonical workflows, routing evaluation, and FastAPI/Frontend integration
+
+- **Phase/Task:** Workflow canonicalization, routing evaluation (rules vs Laya), FastAPI service, and frontend API integration.
+- **Done:**
+  - Implemented the three approved canonical workflows with machine-readable contracts: `quality_assessment`, `spatial_clustering`, and `gene_expression`.
+  - Refactored `run_spatial_clustering` to use `effective_clustering` with matrix-aware dimension bounds across all artifact writes.
+  - Implemented deterministic keyword rules and Laya LLM adapter in `routing.py` with typed decisions, confidence gating, fallback, and malformed output rejection.
+  - Added `scripts/evaluate_routing.py` harness measuring accuracy, abstention rate, latency (mean/median/p95), and errors with CI fake predictor and optional real model run.
+  - Added optional `laya` dependency to `pyproject.toml` and updated `uv.lock`.
+  - Implemented `apps/api/main.py` FastAPI service with `/health`, `/api/workflows`, `/api/datasets`, `/api/select`, and `/api/runs` (list/get/create/report/artifacts) with CORS middleware.
+  - Implemented frontend API client (`frontend/src/lib/bioagent/api.ts`) and store integration connecting web UI to the scientific backend.
+  - Added unit and integration tests across routing, gene expression (exact/ambiguous/not-found/layer errors), canonical workflow contract artifacts, and planner gene/quality paths.
+  - All 71 tests pass; Ruff lint/format clean; `mypy apps src` clean; frontend `tsc --noEmit`, `eslint`, and `next build` clean.
+- **Next:** Phase 4 — LangGraph port with identical behavior, downgrade-only critic, uncertainty gating, escalation, and ablation config.
+- **Open questions:** Science reviewer must confirm provisional thresholds before interpreting evidence states as biological findings.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; no project test or build failures.
+
 ## 2026-09-25 — Second real dataset added
 
 - **Phase/Task:** Dataset expansion — real-first validation with a second DLPFC Visium section.

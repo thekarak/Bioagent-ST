@@ -1,13 +1,27 @@
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import anndata as ad
+import pandas as pd
+from anndata import read_h5ad
 
 from bioagent_st.analysis.clustering import ClusteringParams, cluster_expression
+from bioagent_st.analysis.expression import (
+    GeneExpressionParams,
+    match_report,
+    summarize_expression,
+    summary_table,
+    values_table,
+)
 from bioagent_st.analysis.markers import MarkerParams, find_markers
-from bioagent_st.analysis.qc import QCParams, run_qc
-from bioagent_st.analysis.spatial import SpatialParams, spatial_statistics
+from bioagent_st.analysis.qc import QCParams, assess_quality, counts_like, run_qc
+from bioagent_st.analysis.spatial import (
+    SpatialParams,
+    autocorrelation_table,
+    spatial_statistics,
+)
 from bioagent_st.ledger.provenance_store import ProvenanceStore
 from bioagent_st.schemas.provenance import ProvenanceRecord
 from bioagent_st.schemas.tools import ToolResult
@@ -44,6 +58,480 @@ def _write_provenance(
     )
     store.insert(record)
     return artifact_id
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _layer_names(adata: ad.AnnData) -> list[str]:
+    return ["X", *sorted(str(name) for name in adata.layers)]
+
+
+def run_quality_assessment(
+    adata: ad.AnnData,
+    output_dir: str | Path,
+    params: QCParams | None = None,
+    dataset_hash: str | None = None,
+    store: ProvenanceStore | None = None,
+) -> ToolResult:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    qc_params = params or QCParams()
+    source_hash = dataset_hash or anndata_content_hash(adata)
+    owns_store = store is None
+    store = store or ProvenanceStore(output / "ledger.db")
+    try:
+        assessed = assess_quality(adata, qc_params)
+        qc_path = output / "qc.h5ad"
+        assessed.write_h5ad(qc_path, compression="gzip")
+        qc_artifact_id = _write_provenance(
+            store,
+            qc_path,
+            "qc_result",
+            source_hash,
+            "assess_quality",
+            qc_params.model_dump(),
+            0,
+            [],
+        )
+
+        table_path = output / "qc_table.csv"
+        assessed.obs.reset_index().to_csv(table_path, index=False)
+        table_artifact_id = _write_provenance(
+            store,
+            table_path,
+            "qc_table",
+            source_hash,
+            "assess_quality",
+            qc_params.model_dump(),
+            0,
+            [qc_artifact_id],
+        )
+
+        missing_fields = []
+        if "spatial" not in assessed.obsm:
+            missing_fields.append("obsm['spatial'] - missing (spatial workflows unavailable)")
+        if not any(str(name).startswith(qc_params.mito_prefix) for name in assessed.var_names):
+            missing_fields.append(
+                f"mitochondrial genes with prefix {qc_params.mito_prefix!r} - not found; "
+                "mitochondrial fraction is not assessed"
+            )
+        schema = {
+            "n_obs": int(assessed.n_obs),
+            "n_vars": int(assessed.n_vars),
+            "obs_names_unique": bool(assessed.obs_names.is_unique),
+            "var_names_unique": bool(assessed.var_names.is_unique),
+            "counts_like": counts_like(assessed),
+            "layers": _layer_names(assessed),
+            "spatial_present": "spatial" in assessed.obsm,
+            "spatial_shape": (
+                list(assessed.obsm["spatial"].shape) if "spatial" in assessed.obsm else None
+            ),
+            "missing_fields": missing_fields,
+            "thresholds": qc_params.model_dump(),
+            "observations_below_thresholds": int((~assessed.obs["passes_qc"]).sum()),
+        }
+        schema_path = output / "schema_report.json"
+        _write_json(schema_path, schema)
+        schema_artifact_id = _write_provenance(
+            store,
+            schema_path,
+            "schema_report",
+            source_hash,
+            "assess_quality",
+            qc_params.model_dump(),
+            0,
+            [qc_artifact_id],
+        )
+
+        manifest_path = output / "manifest.json"
+        _write_json(
+            manifest_path,
+            {
+                "tool_name": "quality_assessment",
+                "tool_version": "0.1.0",
+                "dataset_hash": source_hash,
+                "parameters": qc_params.model_dump(),
+                "artifact_ids": [
+                    qc_artifact_id,
+                    table_artifact_id,
+                    schema_artifact_id,
+                ],
+            },
+        )
+        manifest_artifact_id = _write_provenance(
+            store,
+            manifest_path,
+            "run_manifest",
+            source_hash,
+            "quality_assessment",
+            qc_params.model_dump(),
+            0,
+            [qc_artifact_id, table_artifact_id, schema_artifact_id],
+        )
+        return ToolResult(
+            status="ok",
+            artifact_ids=[
+                qc_artifact_id,
+                table_artifact_id,
+                schema_artifact_id,
+                manifest_artifact_id,
+            ],
+            metrics={
+                "n_obs": int(assessed.n_obs),
+                "n_vars": int(assessed.n_vars),
+                "observations_below_thresholds": int((~assessed.obs["passes_qc"]).sum()),
+                "spatial_present": str("spatial" in assessed.obsm),
+            },
+            warnings=missing_fields,
+        )
+    except Exception as error:
+        return ToolResult(status="error", artifact_ids=[], metrics={}, error=str(error))
+    finally:
+        if owns_store:
+            store.close()
+
+
+def _write_spatial_cluster_plot(adata: ad.AnnData, path: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    coordinates = adata.obsm["spatial"]
+    labels = adata.obs["leiden"].astype(str).to_numpy()
+    figure, axis = plt.subplots(figsize=(6, 5))
+    for label in sorted(set(labels)):
+        mask = labels == label
+        axis.scatter(
+            coordinates[mask, 0],
+            coordinates[mask, 1],
+            s=9,
+            label=f"Cluster {label}",
+            linewidths=0,
+        )
+    axis.set_xlabel("spatial x")
+    axis.set_ylabel("spatial y")
+    axis.set_title("Expression clusters (neutral numeric labels)")
+    axis.legend(markerscale=2, fontsize=7, frameon=False)
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+
+
+def _effective_clustering_params(
+    adata: ad.AnnData, params: ClusteringParams | None
+) -> ClusteringParams:
+    effective = params or ClusteringParams()
+    if "n_top_genes" not in effective.model_fields_set:
+        effective = effective.model_copy(
+            update={"n_top_genes": min(effective.n_top_genes, adata.n_vars)}
+        )
+    return effective
+
+
+def run_spatial_clustering(
+    adata: ad.AnnData,
+    output_dir: str | Path,
+    *,
+    qc_params: QCParams | None = None,
+    clustering_params: ClusteringParams | None = None,
+    dataset_hash: str | None = None,
+    store: ProvenanceStore | None = None,
+) -> ToolResult:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    source_hash = dataset_hash or anndata_content_hash(adata)
+    owns_store = store is None
+    store = store or ProvenanceStore(output / "ledger.db")
+    effective_clustering = _effective_clustering_params(adata, clustering_params)
+    try:
+        base = run_qc_clustering(
+            adata,
+            output,
+            dataset_hash=source_hash,
+            qc_params=qc_params,
+            clustering_params=effective_clustering,
+            store=store,
+        )
+        if base.status == "error":
+            return base
+        clustered = read_h5ad(output / "clustered.h5ad")
+        labels = clustered.obs["leiden"].astype(str)
+        cluster_table = (
+            labels.value_counts()
+            .rename_axis("cluster")
+            .reset_index(name="count")
+            .sort_values("cluster", key=lambda values: values.astype(int))
+        )
+        cluster_table["fraction"] = cluster_table["count"] / clustered.n_obs
+        table_path = output / "cluster_table.csv"
+        cluster_table.to_csv(table_path, index=False)
+        table_artifact_id = _write_provenance(
+            store,
+            table_path,
+            "cluster_table",
+            source_hash,
+            "spatial_clustering",
+            effective_clustering.model_dump(),
+            effective_clustering.seed,
+            base.artifact_ids,
+        )
+
+        umap_path = output / "umap_coords.csv"
+        umap = pd.DataFrame(
+            {
+                "obs_id": [str(name) for name in clustered.obs_names],
+                "umap_1": clustered.obsm["X_umap"][:, 0],
+                "umap_2": clustered.obsm["X_umap"][:, 1],
+                "cluster": labels.to_numpy(),
+            }
+        )
+        umap.to_csv(umap_path, index=False)
+        umap_artifact_id = _write_provenance(
+            store,
+            umap_path,
+            "umap_coords",
+            source_hash,
+            "spatial_clustering",
+            effective_clustering.model_dump(),
+            effective_clustering.seed,
+            base.artifact_ids,
+        )
+
+        plot_path = output / "spatial_clusters.png"
+        _write_spatial_cluster_plot(clustered, plot_path)
+        plot_artifact_id = _write_provenance(
+            store,
+            plot_path,
+            "spatial_plot",
+            source_hash,
+            "spatial_clustering",
+            effective_clustering.model_dump(),
+            effective_clustering.seed,
+            base.artifact_ids,
+        )
+
+        manifest_path = output / "manifest.json"
+        _write_json(
+            manifest_path,
+            {
+                "tool_name": "spatial_clustering",
+                "tool_version": "0.1.0",
+                "dataset_hash": source_hash,
+                "qc_parameters": (qc_params or QCParams()).model_dump(),
+                "clustering_parameters": effective_clustering.model_dump(),
+                "artifact_ids": [
+                    *base.artifact_ids,
+                    table_artifact_id,
+                    umap_artifact_id,
+                    plot_artifact_id,
+                ],
+            },
+        )
+        manifest_artifact_id = _write_provenance(
+            store,
+            manifest_path,
+            "run_manifest",
+            source_hash,
+            "spatial_clustering",
+            effective_clustering.model_dump(),
+            effective_clustering.seed,
+            [*base.artifact_ids, table_artifact_id, umap_artifact_id, plot_artifact_id],
+        )
+        all_ids = [
+            *base.artifact_ids,
+            table_artifact_id,
+            umap_artifact_id,
+            plot_artifact_id,
+            manifest_artifact_id,
+        ]
+        return ToolResult(
+            status="ok",
+            artifact_ids=all_ids,
+            metrics={
+                **base.metrics,
+                "n_clusters": int(labels.nunique()),
+                "largest_cluster": int(cluster_table["count"].max()),
+            },
+        )
+    except Exception as error:
+        return ToolResult(status="error", artifact_ids=[], metrics={}, error=str(error))
+    finally:
+        if owns_store:
+            store.close()
+
+
+def _write_expression_plot(
+    adata: ad.AnnData,
+    vectors: dict[str, Any],
+    path: Path,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    coordinates = adata.obsm["spatial"]
+    figure, axes = plt.subplots(1, len(vectors), figsize=(4.2 * len(vectors), 4), squeeze=False)
+    for axis, (gene, values) in zip(axes[0], vectors.items(), strict=True):
+        scatter = axis.scatter(
+            coordinates[:, 0],
+            coordinates[:, 1],
+            c=values,
+            s=10,
+            cmap="viridis",
+            linewidths=0,
+        )
+        axis.set_title(gene, fontsize=9)
+        axis.set_xlabel("spatial x")
+        axis.set_ylabel("spatial y")
+        figure.colorbar(scatter, ax=axis, fraction=0.046, pad=0.04)
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+
+
+def run_gene_expression(
+    adata: ad.AnnData,
+    output_dir: str | Path,
+    params: GeneExpressionParams | None = None,
+    store: ProvenanceStore | None = None,
+) -> ToolResult:
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    source_hash = anndata_content_hash(adata)
+    owns_store = store is None
+    store = store or ProvenanceStore(output / "ledger.db")
+    try:
+        if params is None:
+            raise ValueError("gene expression parameters are required")
+        selected = params
+        if "spatial" not in adata.obsm:
+            raise ValueError("obsm['spatial'] is required for gene expression plots")
+        summaries, vectors = summarize_expression(adata, selected)
+        unresolved = [item for item in summaries if item.match != "exact"]
+
+        match_path = output / "gene_match_report.csv"
+        match_report(summaries, selected.layer).to_csv(match_path, index=False)
+        match_artifact_id = _write_provenance(
+            store,
+            match_path,
+            "gene_match_report",
+            source_hash,
+            "gene_expression",
+            selected.model_dump(),
+            0,
+            [],
+        )
+
+        summary_path = output / "expression_summary.csv"
+        summary_table(summaries).to_csv(summary_path, index=False)
+        summary_artifact_id = _write_provenance(
+            store,
+            summary_path,
+            "expression_summary",
+            source_hash,
+            "gene_expression",
+            selected.model_dump(),
+            0,
+            [match_artifact_id],
+        )
+
+        values_path = output / "expression_values.csv"
+        values_table(adata, vectors).to_csv(values_path, index=False)
+        values_artifact_id = _write_provenance(
+            store,
+            values_path,
+            "expression_values",
+            source_hash,
+            "gene_expression",
+            selected.model_dump(),
+            0,
+            [match_artifact_id],
+        )
+
+        artifact_ids = [match_artifact_id, summary_artifact_id, values_artifact_id]
+        warnings = [
+            f"{item.requested}: {item.match}"
+            + (f" (candidates: {', '.join(item.candidates)})" if item.candidates else "")
+            for item in unresolved
+        ]
+
+        if vectors:
+            plot_path = output / "spatial_expression.png"
+            _write_expression_plot(adata, vectors, plot_path)
+            plot_artifact_id = _write_provenance(
+                store,
+                plot_path,
+                "spatial_plot",
+                source_hash,
+                "gene_expression",
+                selected.model_dump(),
+                0,
+                [values_artifact_id],
+            )
+            artifact_ids.append(plot_artifact_id)
+
+            autocorr = autocorrelation_table(
+                adata,
+                list(vectors),
+                SpatialParams(n_perms=100, genes=list(vectors), seed=0),
+            )
+            autocorr_path = output / "spatial_autocorr.csv"
+            autocorr.to_csv(autocorr_path, index=False)
+            autocorr_artifact_id = _write_provenance(
+                store,
+                autocorr_path,
+                "spatial_autocorrelation",
+                source_hash,
+                "gene_expression",
+                selected.model_dump(),
+                0,
+                [values_artifact_id],
+            )
+            artifact_ids.append(autocorr_artifact_id)
+
+        manifest_path = output / "manifest.json"
+        _write_json(
+            manifest_path,
+            {
+                "tool_name": "gene_expression",
+                "tool_version": "0.1.0",
+                "dataset_hash": source_hash,
+                "parameters": selected.model_dump(),
+                "resolved_genes": list(vectors),
+                "artifact_ids": artifact_ids,
+            },
+        )
+        manifest_artifact_id = _write_provenance(
+            store,
+            manifest_path,
+            "run_manifest",
+            source_hash,
+            "gene_expression",
+            selected.model_dump(),
+            0,
+            artifact_ids,
+        )
+        artifact_ids.append(manifest_artifact_id)
+        status = "ok" if not unresolved else "partial"
+        return ToolResult(
+            status=status,
+            artifact_ids=artifact_ids,
+            metrics={
+                "requested_genes": len(summaries),
+                "resolved_genes": len(vectors),
+                "unresolved_genes": len(unresolved),
+            },
+            warnings=warnings,
+        )
+    except Exception as error:
+        return ToolResult(status="error", artifact_ids=[], metrics={}, error=str(error))
+    finally:
+        if owns_store:
+            store.close()
 
 
 def run_qc_clustering(

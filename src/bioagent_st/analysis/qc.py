@@ -9,9 +9,24 @@ class QCParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     min_genes: int = Field(200, ge=0, le=10_000)
+    min_counts: int = Field(0, ge=0, le=100_000)
     min_cells: int = Field(3, ge=0, le=10_000)
     max_mito_pct: float = Field(20.0, ge=0, le=100)
     mito_prefix: str = "MT-"
+
+
+def assess_quality(adata: ad.AnnData, params: QCParams) -> ad.AnnData:
+    if adata.n_obs < 1 or adata.n_vars < 1:
+        raise ValueError("AnnData must contain observations and genes")
+    result = adata.copy()
+    result.var["mito"] = result.var_names.str.startswith(params.mito_prefix)
+    sc.pp.calculate_qc_metrics(result, qc_vars=["mito"], percent_top=None, inplace=True)
+    result.obs["passes_qc"] = (
+        (result.obs["n_genes_by_counts"] >= params.min_genes)
+        & (result.obs["total_counts"] >= params.min_counts)
+        & (result.obs["pct_counts_mito"] <= params.max_mito_pct)
+    )
+    return result
 
 
 def run_qc(adata: ad.AnnData, params: QCParams) -> ad.AnnData:
@@ -20,8 +35,10 @@ def run_qc(adata: ad.AnnData, params: QCParams) -> ad.AnnData:
     result = adata.copy()
     result.var["mito"] = result.var_names.str.startswith(params.mito_prefix)
     sc.pp.calculate_qc_metrics(result, qc_vars=["mito"], percent_top=None, inplace=True)
-    keep_obs = (result.obs["n_genes_by_counts"] >= params.min_genes) & (
-        result.obs["pct_counts_mito"] <= params.max_mito_pct
+    keep_obs = (
+        (result.obs["n_genes_by_counts"] >= params.min_genes)
+        & (result.obs["total_counts"] >= params.min_counts)
+        & (result.obs["pct_counts_mito"] <= params.max_mito_pct)
     )
     result = result[keep_obs].copy()
     if result.n_obs < max(params.min_cells, 1):

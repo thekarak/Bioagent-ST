@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 import squidpy as sq
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,6 +39,30 @@ def build_spatial_graph(
         n_nodes=result.n_obs,
     )
     return result, report
+
+
+def autocorrelation_table(
+    adata: ad.AnnData, genes: list[str], params: SpatialParams
+) -> pd.DataFrame:
+    if not genes:
+        raise ValueError("at least one gene is required for spatial autocorrelation")
+    missing = [gene for gene in genes if gene not in adata.var_names]
+    if missing:
+        raise ValueError("genes are not exact var_names matches: " + ", ".join(missing))
+    result, _ = build_spatial_graph(adata, params)
+    sq.gr.spatial_autocorr(
+        result,
+        genes=genes,
+        mode="moran",
+        n_perms=params.n_perms,
+        seed=params.seed,
+        show_progress_bar=False,
+        n_jobs=1,
+        table_key="spatial_autocorr",
+    )
+    table = result.uns["moranI"]
+    table = table.reset_index().rename(columns={"index": "gene"})
+    return table
 
 
 def spatial_statistics(

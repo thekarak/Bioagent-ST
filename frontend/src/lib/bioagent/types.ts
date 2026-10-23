@@ -53,7 +53,7 @@ export interface DatasetMeta {
   checksumLabel: string | null;
   /** Whether this dataset can be loaded in the local demo adapter. */
   loadable: boolean;
-  illustrative: true;
+  illustrative: boolean;
 }
 
 export interface GeneInfo {
@@ -332,7 +332,7 @@ export interface RunRecord {
   artifacts: ArtifactRef[];
   report: ReportRecord | null;
   failure: FailureInfo | null;
-  illustrative: true;
+  illustrative: boolean;
 }
 
 /* ---------- Prerequisites ---------- */

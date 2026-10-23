@@ -24,6 +24,11 @@ dependencies = [
     "uvicorn",
 ]
 
+[project.optional-dependencies]
+laya = [
+    "laya>=0.4.0",
+]
+
 [project.scripts]
 bioagent-st = "bioagent_st.cli:main"
 
@@ -41,6 +46,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "-ra"
+pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "slow: tests using larger datasets or expensive analyses",
@@ -65,5 +71,5 @@ plugins = ["pydantic.mypy"]
 exclude = ["_blueprint_extracted.txt"]
 
 [[tool.mypy.overrides]]
-module = ["squidpy.*", "scanpy.*", "anndata.*", "scipy.*", "pandas.*", "yaml.*"]
+module = ["squidpy.*", "scanpy.*", "anndata.*", "scipy.*", "pandas.*", "yaml.*", "laya", "laya.*"]
 ignore_missing_imports = true
