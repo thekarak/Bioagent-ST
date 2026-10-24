@@ -1,6 +1,55 @@
-﻿# Progress log — BioAgent-ST
+# Progress log — BioAgent-ST
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
+
+## 2026-10-24 — Blueprint Gap Remediation & Full Audit Verification (C1–C4, H1–H6, M1–M6)
+
+- **Phase/Task:** Comprehensive remediation of audit findings C1–C4, H1–H6, M1–M6 against the research blueprint (`skills/bioagent-st-builder/SKILL.md` and `_blueprint_extracted.txt`).
+- **Done:**
+  - **C1 (Policy Gating):** Enforced pre-execution policy gating before running any tool step. Halts with `status="blocked"` when prerequisite evidence or policy denies execution. Wired API to preserve router confidence via `FixedSelector`.
+  - **C2 (Contract & Data Integrity):** Activated pure validation checks (`no_nans_check`, `duplicate_id_check`, `spatial_coordinate_check`, `counts_available_check`) in `verification/checks.py` and `tools/workflow.py`. Workflows fail cleanly with explicit error status prior to artifact creation if AnnData is malformed.
+  - **C3 (Report Hash & Physical Artifact Verification):** Updated `validate_report()` in `reporting/generator.py` to physically inspect on-disk artifact existence and byte SHA-256 integrity against ledger records.
+  - **C4 (Routing Benchmark Expansion):** Expanded evaluation harness `scripts/evaluate_routing.py` to 75 queries across 5 balanced categories with Macro-F1 (0.963), per-class precision/recall, confusion matrices, abstention precision (96.5%) / recall (93.3%), and unauthorized execution rate (6.7%).
+  - **H1 (Safe Token-Boundary Routing):** Upgraded `routing.py` with word-boundary `\b` regexes to prevent false triggers on non-ST queries and prompt injections.
+  - **H2 (Layer-Aware Spatial Autocorrelation):** Added explicit `layer` support to `SpatialParams` and `autocorrelation_table()`; eliminated silent `layer="counts"` remapping in `apps/api/main.py`.
+  - **H3 (Traceable Provenance Ledger):** Cached `git_commit()` via `@functools.lru_cache` to store real commit hashes in provenance without filesystem latency. Enriched API run records with `request_text`, `gate_outcome`, `policy`, and artifact metadata.
+  - **H4 (Config-Driven Thresholds):** Unified threshold resolution in executor via `_get_thresholds()` reading `configs/thresholds.yaml`.
+  - **H5 (Registry Dispatch):** Replaced hard-coded dispatch in `executor.py` with strict `REGISTRY.assert_supported()`.
+  - **H6 (Frontend Truthfulness):** Connected frontend `api.ts` and `store.ts` to live backend policy decisions, real dataset hashes, and real code commits. Restricted local demo simulation strictly to offline API fallback.
+  - **M1 (Deterministic Manifests):** Replaced random UUIDs in `manifest.json` and report manifest hashes with deterministic sorted file records and SHA-256 digests.
+  - **M5 (Ablation Specification & CLI):** Authored `docs/ablations.md` and wired `--mode`, `--no-ledger`, `--no-critic`, `--no-gating`, and `--no-provenance-constraints` flags across CLI.
+  - **M6 (Literature Matrix & Novelty Map):** Populated structured `docs/literature_matrix.md` and `docs/novelty_map.md` with explicit non-claims and testable hypotheses.
+  - **Verification:** 139 unit tests, 5 integration tests, and 75 routing cases pass green; Ruff lint and format clean; Mypy clean.
+- **Next:** Phase 4 — LangGraph port with identical behavior, downgrade-only critic, uncertainty gating, escalation, and ablation config.
+- **Open questions:** None.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; no project failures.
+
+## 2026-10-24 — Ablation specification and CLI enablement (Audit finding M5)
+
+- **Phase/Task:** Claude audit finding M5 remediation — create docs/ablations.md and enable CLI arguments for ablations and baselines.
+- **Done:**
+  - Created docs/ablations.md detailing the operational semantics of all baseline modes (full, tool_baseline, schema_baseline, react_baseline) and component ablation flags (--no-ledger, --no-critic, --no-gating, --no-provenance-constraints).
+  - Updated src/bioagent_st/cli.py to add CLI arguments --mode, --no-ledger, --no-critic, --no-gating, and --no-provenance-constraints.
+  - Updated src/bioagent_st/agent_cli.py with build_agent_config(args) and passed typed AgentConfig to execute_plan(...).
+  - Wired safe report validation: when provenance_constraints_enabled=False, validate_report() is skipped; when ledger_enabled=False, report validation and store cleanup handle absent SQLite evidence records cleanly without crashing.
+  - Added unit test suite tests/unit/test_ablations_cli.py verifying parser defaults, ablation flags, baseline modes, and end-to-end execution with ablations.
+  - Formatted and linted touched files with ruff check and ruff format.
+- **Next:** Phase 4 — LangGraph execution graph port with downgrade-only critic.
+- **Open questions:** None.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; no project failures.
+
+## 2026-10-24 — Literature matrix and novelty map populated (Audit finding M6)
+
+- **Phase/Task:** Claude audit finding M6 remediation — populate docs/literature_matrix.md and docs/novelty_map.md.
+- **Done:**
+  - Fully populated docs/literature_matrix.md with structured comparative matrix across six operational dimensions (Analysis Paradigm, Verification Layer, Uncertainty Handling, Provenance Traceability, Safe Failure / Refusal Handling).
+  - Included traditional ST toolkits (Scanpy, Squidpy, Seurat), spatial/single-cell LLM agent systems (SpatialAgent, STAT, STAgent, ChatSpatial, CASSIA), and scientific LLM systems (ChemCrow, ChatCell/Biome, BioCypher, Generic ReAct agents) compared directly against BioAgent-ST.
+  - Fully populated docs/novelty_map.md enforcing Non-Negotiable Principle 9 ('Never write text that claims novelty, superiority, or calibrated confidence without experimental evidence').
+  - Formatted into clear sections: Architectural Contributions, Hypotheses Under Empirical Test, Differentiators Tracking Matrix, Explicit Non-Claims, and codified Scientific Guardrails.
+  - Verified formatting with uv run ruff format --check docs/.
+- **Next:** Phase 4 — LangGraph port with identical behavior, downgrade-only critic, uncertainty gating, escalation, and ablation config.
+- **Open questions:** Science reviewer confirmation of provisional thresholds.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; no project failures.
 
 ## 2026-10-24 — Policy gate, workflow registry, ablation schema, and fault-injection routing suite
 

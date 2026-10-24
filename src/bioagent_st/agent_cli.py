@@ -16,6 +16,7 @@ from bioagent_st.routing import (
     RuleSelector,
     WorkflowSelector,
 )
+from bioagent_st.schemas.agent_config import AgentConfig
 from bioagent_st.schemas.workflows import SUPPORTED_WORKFLOWS
 from bioagent_st.utils.hashing import anndata_content_hash
 
@@ -31,7 +32,46 @@ def _parameters(args: argparse.Namespace) -> dict[str, Any]:
     return {}
 
 
-def run_agent(args: argparse.Namespace) -> None:
+def build_agent_config(args: argparse.Namespace) -> AgentConfig:
+    """Build an AgentConfig instance from parsed CLI arguments."""
+    mode = getattr(args, "mode", "full")
+    no_ledger = getattr(args, "no_ledger", False)
+    no_critic = getattr(args, "no_critic", False)
+    no_gating = getattr(args, "no_gating", False)
+    no_prov = getattr(args, "no_provenance_constraints", False)
+
+    # Defaults by baseline mode
+    if mode in ("tool_baseline", "schema_baseline", "react_baseline"):
+        ledger_default = False
+        critic_default = False
+        gating_default = False
+    else:
+        ledger_default = True
+        critic_default = True
+        gating_default = True
+
+    ledger_enabled = ledger_default and not no_ledger
+    critic_enabled = critic_default and not no_critic
+    gating_enabled = gating_default and not no_gating
+    provenance_constraints_enabled = not no_prov
+
+    selector = getattr(args, "selector", "rules")
+    workflow = getattr(args, "workflow", None)
+
+    return AgentConfig(
+        mode=mode,
+        ledger_enabled=ledger_enabled,
+        critic_enabled=critic_enabled,
+        gating_enabled=gating_enabled,
+        provenance_constraints_enabled=provenance_constraints_enabled,
+        selector=selector if selector in ("rules", "laya", "manual") else "rules",
+        manual_workflow=workflow if selector == "manual" else None,
+    )
+
+
+def run_agent(args: argparse.Namespace, config: AgentConfig | None = None) -> None:
+    if config is None:
+        config = build_agent_config(args)
     output = Path(args.output)
     adata = load_dataset(args.source, args.dataset)
     dataset_id = args.dataset_id or args.source
@@ -53,9 +93,10 @@ def run_agent(args: argparse.Namespace) -> None:
         output,
         experiment_id=args.experiment_id,
         dataset_hash=anndata_content_hash(adata),
+        config=config,
     )
     provenance_store = ProvenanceStore(output / "ledger.db")
-    evidence_store = EvidenceStore(output / "ledger.db")
+    evidence_store = EvidenceStore(output / "ledger.db") if config.ledger_enabled else None
     try:
         report = build_report(
             question=args.question,
@@ -65,10 +106,12 @@ def run_agent(args: argparse.Namespace) -> None:
             provenance=provenance_store.list(),
             artifact_ids_by_step=result.step_artifact_ids,
         )
-        validate_report(report, evidence_store, provenance_store)
+        if config.provenance_constraints_enabled:
+            validate_report(report, evidence_store, provenance_store)
         write_report(report, output / "report.md")
     finally:
-        evidence_store.close()
+        if evidence_store is not None:
+            evidence_store.close()
         provenance_store.close()
     print(
         json.dumps(

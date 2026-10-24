@@ -37,29 +37,75 @@ def min_observation_check(adata: ad.AnnData, minimum: int = 3) -> CheckResult:
     )
 
 
-def spatial_coordinate_check(adata: ad.AnnData) -> CheckResult:
-    valid = "spatial" in adata.obsm
-    detail = "obsm['spatial'] present" if valid else "obsm['spatial'] missing"
-    if valid:
-        coordinates = adata.obsm["spatial"]
-        valid = bool(
-            coordinates.ndim == 2
-            and coordinates.shape[0] == adata.n_obs
-            and coordinates.shape[1] >= 2
-            and np.isfinite(coordinates[:, :2]).all()
+def spatial_coordinate_check(adata: ad.AnnData, required: bool = True) -> CheckResult:
+    if "spatial" not in adata.obsm:
+        return result(
+            "data.spatial_coords_valid",
+            "fail" if required else "warn",
+            "hard" if required else "soft",
+            detail="obsm['spatial'] is missing",
         )
-    return result("data.spatial_coords_valid", "pass" if valid else "fail", "hard", detail=detail)
+    coordinates = adata.obsm["spatial"]
+    valid = bool(
+        coordinates.ndim == 2
+        and coordinates.shape[0] == adata.n_obs
+        and coordinates.shape[1] >= 2
+        and np.isfinite(coordinates[:, :2]).all()
+    )
+    return result(
+        "data.spatial_coords_valid",
+        "pass" if valid else "fail",
+        "hard",
+        detail=(
+            "obsm['spatial'] present and valid"
+            if valid
+            else "obsm['spatial'] coordinates have invalid shape or contain NaNs/Infs"
+        ),
+    )
 
 
 def duplicate_id_check(adata: ad.AnnData) -> CheckResult:
-    valid = bool(adata.obs_names.is_unique and adata.var_names.is_unique)
-    return result("data.duplicate_ids", "pass" if valid else "fail", "hard")
+    obs_dup = not adata.obs_names.is_unique
+    var_dup = not adata.var_names.is_unique
+    valid = not (obs_dup or var_dup)
+    detail_parts: list[str] = []
+    if obs_dup:
+        detail_parts.append("Duplicate observation (spot) identifiers detected")
+    if var_dup:
+        detail_parts.append("Duplicate variable (gene) identifiers detected")
+    return result(
+        "data.duplicate_ids",
+        "pass" if valid else "fail",
+        "hard",
+        detail="; ".join(detail_parts) if detail_parts else "IDs are unique",
+    )
+
+
+def no_nans_check(adata: ad.AnnData) -> CheckResult:
+    import scipy.sparse as sp
+
+    values = adata.X
+    if sp.issparse(values):
+        has_nans = bool(np.isnan(values.data).any())
+    else:
+        has_nans = bool(np.isnan(values).any())
+    return result(
+        "data.no_nans",
+        "fail" if has_nans else "pass",
+        "hard",
+        detail="NaN values detected in expression matrix" if has_nans else "No NaNs detected",
+    )
 
 
 def counts_available_check(adata: ad.AnnData) -> CheckResult:
+    import scipy.sparse as sp
+
     values = adata[: min(100, adata.n_obs), : min(200, adata.n_vars)].X
-    values = values.toarray() if hasattr(values, "toarray") else values
-    available = bool(values.size and np.isfinite(values).all() and (values >= 0).all())
+    if sp.issparse(values):
+        data = values.data
+        available = bool(data.size and np.isfinite(data).all() and (data >= 0).all())
+    else:
+        available = bool(values.size and np.isfinite(values).all() and (values >= 0).all())
     return result("data.counts_available", "pass" if available else "fail", "hard")
 
 

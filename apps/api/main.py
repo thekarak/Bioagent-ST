@@ -19,6 +19,7 @@ from bioagent_st.ledger.provenance_store import ProvenanceStore
 from bioagent_st.llm.client import MockLLMClient
 from bioagent_st.reporting.generator import build_report, validate_report, write_report
 from bioagent_st.routing import (
+    FixedSelector,
     LayaSelector,
     ManualSelector,
     RuleSelector,
@@ -111,9 +112,6 @@ def _workflow_parameters(workflow: str, parameters: dict[str, Any]) -> dict[str,
         return {"clustering": clustering_payload}
     if workflow == "gene_expression":
         payload = dict(parameters)
-        layer = str(payload.get("layer", "X"))
-        if layer == "counts":
-            payload["layer"] = "X"
         return dict(GeneExpressionParams.model_validate(payload).model_dump())
     raise HTTPException(status_code=422, detail=f"unsupported workflow: {workflow}")
 
@@ -214,7 +212,7 @@ def create_run(request: RunRequest) -> dict[str, Any]:
         parameters = _workflow_parameters(decision.decision, request.parameters)
         plan = Planner(
             MockLLMClient(),
-            selector=ManualSelector(decision.decision),
+            selector=FixedSelector(decision),
         ).create_plan(request.question, request.dataset_id, parameters)
     except HTTPException:
         raise
@@ -268,9 +266,17 @@ def create_run(request: RunRequest) -> dict[str, Any]:
         evidence_store.close()
         provenance_store.close()
 
+    gate_outcome = result.gate_results[-1].decision if result.gate_results else "ALLOW"
+    gate_reasons = result.gate_results[-1].reasons if result.gate_results else []
     run_record: dict[str, Any] = {
         "run_id": run_id,
+        "request_text": request.question,
         "status": "review" if result.needs_review else "completed",
+        "gate_outcome": gate_outcome,
+        "policy": {
+            "decision": gate_outcome,
+            "reasons": gate_reasons,
+        },
         "selector": decision.model_dump(),
         "workflow": decision.decision,
         "plan": plan.model_dump(mode="json"),
@@ -282,6 +288,10 @@ def create_run(request: RunRequest) -> dict[str, Any]:
                 "artifact_type": item.artifact_type,
                 "output_uri": item.output_uri,
                 "output_hash": item.output_hash,
+                "dataset_hash": item.dataset_hash,
+                "code_commit": item.code_commit,
+                "tool_name": item.tool_name,
+                "tool_version": item.tool_version,
             }
             for item in provenance
         ],

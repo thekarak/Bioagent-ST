@@ -233,22 +233,23 @@ export function convertBackendRunToRecord(
     }
   }
 
+  const firstArtifact = backend.artifacts[0];
   const provenanceFields = [
     {
       field: "Dataset Hash",
-      value: (backend.plan as any)?.dataset_id || "recorded",
+      value: (firstArtifact as any)?.dataset_hash || (backend.plan as any)?.dataset_id || "recorded",
       availability: "recorded" as const,
       mono: true,
     },
     {
       field: "Code Commit",
-      value: "Recorded in SQLite ledger",
+      value: (firstArtifact as any)?.code_commit || "recorded",
       availability: "recorded" as const,
       mono: true,
     },
     {
       field: "Tool Name & Version",
-      value: `${backend.workflow} (0.1.0)`,
+      value: `${(firstArtifact as any)?.tool_name || backend.workflow} (${(firstArtifact as any)?.tool_version || "0.1.0"})`,
       availability: "recorded" as const,
     },
   ];
@@ -295,6 +296,17 @@ export function convertBackendRunToRecord(
     workflow: backend.workflow,
     params,
     status: backend.status === "review" ? "needs_review" : "verified",
+    policy: (backend as any).policy
+      ? {
+          decision: (backend as any).policy.decision,
+          reason: ((backend as any).policy.reasons || []).join("; ") || "Policy evaluated by backend gate",
+          detail: "",
+        }
+      : {
+          decision: "ALLOW",
+          reason: "All required prerequisites passed",
+          detail: "",
+        },
     artifacts: artifactRefs,
     verification: verificationChecks.length > 0 ? verificationChecks : null,
     provenance: provenanceRecord,

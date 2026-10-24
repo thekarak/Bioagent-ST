@@ -79,6 +79,36 @@ def build_parser() -> argparse.ArgumentParser:
     agent.add_argument("--genes", nargs="+")
     agent.add_argument("--layer", default="X")
     agent.add_argument("--params-json")
+    agent.add_argument(
+        "--mode",
+        choices=("full", "tool_baseline", "schema_baseline", "react_baseline"),
+        default="full",
+        help="Ablation baseline mode (default: 'full')",
+    )
+    agent.add_argument(
+        "--no-ledger",
+        action="store_true",
+        default=False,
+        help="Disable SQLite evidence ledger persistence",
+    )
+    agent.add_argument(
+        "--no-critic",
+        action="store_true",
+        default=False,
+        help="Bypass LLM critic node; state remains rule_state",
+    )
+    agent.add_argument(
+        "--no-gating",
+        action="store_true",
+        default=False,
+        help="Disable policy gating (always ALLOW)",
+    )
+    agent.add_argument(
+        "--no-provenance-constraints",
+        action="store_true",
+        default=False,
+        help="Disable report validator fail-close checks",
+    )
     return parser
 
 

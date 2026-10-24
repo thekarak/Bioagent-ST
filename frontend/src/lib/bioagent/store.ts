@@ -216,20 +216,22 @@ export const useBioAgentStore = create<BioAgentStore>((set, get) => ({
                 }),
               }));
             })
-            .catch(() => {});
-          results = executeDemoWorkflow(engine, workflow, input.params);
-          if (results) {
-            assembled = assembleRunEvidence(
-              runId,
-              input.question,
-              meta,
-              dataset?.fingerprint ?? engine.fingerprint(),
-              workflow,
-              input.params,
-              results,
-              run.createdAt
-            );
-          }
+            .catch(() => {
+              // Fallback to local simulation only if backend API is offline
+              results = executeDemoWorkflow(engine, workflow, input.params);
+              if (results) {
+                assembled = assembleRunEvidence(
+                  runId,
+                  input.question,
+                  meta,
+                  dataset?.fingerprint ?? engine.fingerprint(),
+                  workflow,
+                  input.params,
+                  results,
+                  run.createdAt
+                );
+              }
+            });
         }
         if (stage === "scientific_execution" && !results) {
           failure = {

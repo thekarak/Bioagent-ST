@@ -6,7 +6,7 @@ from bioagent_st.reporting.models import ReportFinding, ScientificReport, Workfl
 from bioagent_st.schemas.evidence import EvidenceRecord
 from bioagent_st.schemas.plans import AnalysisPlan
 from bioagent_st.schemas.provenance import ProvenanceRecord
-from bioagent_st.utils.hashing import sha256_text
+from bioagent_st.utils.hashing import sha256_file, sha256_text
 
 
 class ReportValidationError(ValueError):
@@ -15,24 +15,46 @@ class ReportValidationError(ValueError):
 
 def validate_report(
     report: ScientificReport,
-    evidence_store: EvidenceStore,
+    evidence_store: EvidenceStore | None,
     provenance_store: ProvenanceStore,
 ) -> None:
-    for finding in report.findings:
-        evidence = evidence_store.get(finding.evidence_id)
-        if evidence is None:
-            raise ReportValidationError(f"unknown evidence ID: {finding.evidence_id}")
-        if evidence.state != finding.section:
-            raise ReportValidationError("finding section differs from ledger evidence state")
-        if finding.section == "supported" and evidence.state != "supported":
-            raise ReportValidationError("unsupported evidence cannot appear in supported section")
+    if evidence_store is not None:
+        for finding in report.findings:
+            evidence = evidence_store.get(finding.evidence_id)
+            if evidence is None:
+                raise ReportValidationError(f"unknown evidence ID: {finding.evidence_id}")
+            if evidence.state != finding.section:
+                raise ReportValidationError(
+                    f"finding section '{finding.section}' differs from "
+                    f"ledger evidence state '{evidence.state}'"
+                )
+
+    checked_artifacts: set[str] = set()
+
+    def _verify_artifact(artifact_id: str) -> None:
+        if artifact_id in checked_artifacts:
+            return
+        record = provenance_store.get(artifact_id)
+        if record is None:
+            raise ReportValidationError(f"unknown artifact ID: {artifact_id}")
+        path = Path(record.output_uri)
+        if not path.exists():
+            raise ReportValidationError(
+                f"artifact file missing on disk: {record.output_uri} (ID: {artifact_id})"
+            )
+        actual_hash = sha256_file(path)
+        if actual_hash != record.output_hash:
+            raise ReportValidationError(
+                f"artifact file hash mismatch on disk for {artifact_id}: "
+                f"expected {record.output_hash}, got {actual_hash}"
+            )
+        checked_artifacts.add(artifact_id)
+
     for statement in report.quantitative_statements:
-        if provenance_store.get(statement.artifact_id) is None:
-            raise ReportValidationError(f"unknown artifact ID: {statement.artifact_id}")
+        _verify_artifact(statement.artifact_id)
     for entry in report.workflow:
         for artifact_id in entry.artifact_ids:
-            if provenance_store.get(artifact_id) is None:
-                raise ReportValidationError(f"unknown workflow artifact ID: {artifact_id}")
+            _verify_artifact(artifact_id)
 
 
 def build_report(

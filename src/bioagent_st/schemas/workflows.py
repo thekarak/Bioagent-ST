@@ -62,7 +62,7 @@ WORKFLOW_CONTRACTS: dict[SupportedWorkflowId, EvidenceContract] = {
         ],
         allowed_parameters=[
             ContractParameter(label="min_counts", range="0 - 100,000"),
-            ContractParameter(label="min_genes", range="0 - 5,000"),
+            ContractParameter(label="min_genes", range="0 - 10,000"),
         ],
         expected_artifacts=[
             "schema_report.json",
@@ -93,10 +93,10 @@ WORKFLOW_CONTRACTS: dict[SupportedWorkflowId, EvidenceContract] = {
             ContractInput(label="obs / var IDs", requirement="unique identifiers"),
         ],
         allowed_parameters=[
-            ContractParameter(label="n_pcs", range="5 - 100"),
-            ContractParameter(label="n_neighbors", range="3 - 50"),
-            ContractParameter(label="resolution", range="0.1 - 3.0"),
-            ContractParameter(label="seed", range="0 - 2^31-1"),
+            ContractParameter(label="n_pcs", range="2 - 200"),
+            ContractParameter(label="n_neighbors", range="2 - 200"),
+            ContractParameter(label="resolution", range="0.01 - 10.0"),
+            ContractParameter(label="seed", range="0 - 2^32-1"),
         ],
         expected_artifacts=[
             "clustered.h5ad",

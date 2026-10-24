@@ -56,3 +56,4 @@ experiments/results/
 *.pem
 *.key
 secrets.*
+.matplotlib/

@@ -27,6 +27,15 @@ class LayaPredictor(Protocol):
     ) -> dict[str, Any]: ...
 
 
+_EXPLICIT_ABSTAIN_PATTERNS: tuple[str, ...] = (
+    r"\b(ignore|override|bypass)\b.*\b(instructions?|rules?|system|prompt)\b",
+    r"\b(admin|root|sudo|system access)\b",
+    r"\b(do not|don'?t|never|stop|abort)\b",
+    r"\b(cell type|cell types|cell identity|cell identities)\b",
+    r"\b(survival|prognosis|chemotherapy|clinical|patient outcome)\b",
+    r"\b(hospital|weather|flight|restaurant|stock price)\b",
+)
+
 _RULES: dict[SupportedWorkflowId, tuple[str, ...]] = {
     "quality_assessment": (
         "quality",
@@ -36,8 +45,10 @@ _RULES: dict[SupportedWorkflowId, tuple[str, ...]] = {
         "inspect",
         "schema",
         "dimension",
+        "dimensions",
         "structure",
         "missing field",
+        "missing fields",
         "quality control",
         "assess",
         "check the dataset",
@@ -45,6 +56,7 @@ _RULES: dict[SupportedWorkflowId, tuple[str, ...]] = {
     "spatial_clustering": (
         "cluster",
         "clustering",
+        "clusters",
         "spatial domains",
         "expression patterns",
         "leiden",
@@ -57,14 +69,17 @@ _RULES: dict[SupportedWorkflowId, tuple[str, ...]] = {
     ),
     "gene_expression": (
         "gene",
+        "genes",
         "expression of",
+        "spatial expression",
         "marker",
+        "markers",
         "expressed",
         "feature plot",
         "expression map",
-        "where is",
         "expression level",
         "transcript",
+        "transcripts",
     ),
 }
 
@@ -73,11 +88,39 @@ def normalize_question(question: str) -> str:
     return _NORMALIZE.sub(" ", question.strip().lower())
 
 
+def _signal_matches(signal: str, normalized: str) -> bool:
+    pattern = r"\b" + re.escape(signal) + r"\b"
+    return bool(re.search(pattern, normalized))
+
+
 def select_by_rules(question: str) -> SelectorDecision:
     normalized = normalize_question(question)
+    if not normalized:
+        return SelectorDecision(
+            kind="rules",
+            name="Deterministic rules",
+            version="rules-v1",
+            decision="unsupported_or_ambiguous",
+            matched_signals=[],
+            normalized_intent=None,
+            notes="Empty question; selector abstains.",
+        )
+
+    for pattern in _EXPLICIT_ABSTAIN_PATTERNS:
+        if re.search(pattern, normalized):
+            return SelectorDecision(
+                kind="rules",
+                name="Deterministic rules",
+                version="rules-v1",
+                decision="unsupported_or_ambiguous",
+                matched_signals=[],
+                normalized_intent=normalized,
+                notes="Request triggered safety/abstention rule; execution blocked.",
+            )
+
     matches: list[tuple[SupportedWorkflowId, tuple[str, ...]]] = []
     for workflow, signals in _RULES.items():
-        hits = tuple(signal for signal in signals if signal in normalized)
+        hits = tuple(signal for signal in signals if _signal_matches(signal, normalized))
         if hits:
             matches.append((workflow, hits))
     if not matches:

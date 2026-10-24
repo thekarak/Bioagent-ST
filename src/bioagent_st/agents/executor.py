@@ -15,6 +15,7 @@ from bioagent_st.ledger.provenance_store import ProvenanceStore
 from bioagent_st.schemas.agent_config import AgentConfig
 from bioagent_st.schemas.evidence import CheckResult, EvidenceRecord
 from bioagent_st.schemas.plans import AnalysisPlan
+from bioagent_st.schemas.registry import REGISTRY
 from bioagent_st.tools.workflow import (
     run_gene_expression,
     run_markers,
@@ -36,6 +37,7 @@ from bioagent_st.verification.checks import (
     qc_pass_check,
     spatial_graph_check,
 )
+from bioagent_st.verification.config import ThresholdConfig, load_thresholds
 from bioagent_st.verification.policy_gate import (
     EvidenceBand,
     GateConfig,
@@ -44,6 +46,13 @@ from bioagent_st.verification.policy_gate import (
     gate_request,
 )
 from bioagent_st.verification.rules import evidence_from_checks
+
+
+def _get_thresholds() -> ThresholdConfig:
+    try:
+        return load_thresholds()
+    except Exception:
+        return ThresholdConfig(values={}, provisional=True)
 
 
 class ExecutionError(RuntimeError):
@@ -75,10 +84,13 @@ def _claim_evidence(
     evidence: list[EvidenceRecord] = []
     if "leiden" not in clustered.obs:
         return evidence
+    thresholds = _get_thresholds()
+    min_cluster_size = float(thresholds.get("cluster", "min_cluster_size", 10.0))
     cluster_checks: list[CheckResult] = [
         qc_pass_check(clustered),
         cluster_min_size_check(
-            [int(value) for value in clustered.obs["leiden"].value_counts().tolist()], 10.0
+            [int(value) for value in clustered.obs["leiden"].value_counts().tolist()],
+            min_cluster_size,
         ),
     ]
     cluster_evidence = evidence_from_checks(
@@ -98,10 +110,13 @@ def _claim_evidence(
             top = markers.iloc[0]
             group = str(top["group"])
             group_size = int((clustered.obs["leiden"].astype(str) == group).sum())
+            min_effect = float(thresholds.get("marker", "min_effect_size", 0.2))
+            max_padj = float(thresholds.get("marker", "max_padj", 0.05))
+            min_grp = float(thresholds.get("marker", "min_group_size", 10.0))
             marker_checks = [
-                marker_effect_size_check(float(top["scores"]), 0.2),
-                marker_fdr_check(float(top["pvals_adj"]), 0.05),
-                marker_group_size_check(float(group_size), 10.0),
+                marker_effect_size_check(float(top["scores"]), min_effect),
+                marker_fdr_check(float(top["pvals_adj"]), max_padj),
+                marker_group_size_check(float(group_size), min_grp),
                 marker_circularity_check(),
             ]
             marker_evidence = evidence_from_checks(
@@ -215,8 +230,33 @@ def execute_plan(
     needs_review = False
     gate_results: list[GateResult] = []
 
+    # 1. Pre-execution policy gate (evaluates selector intent & confidence before running tools)
+    if cfg.gating_enabled and plan.selector_decision is not None:
+        initial_gate = gate_request(
+            plan.selector_decision,
+            evidence_band="unknown",
+            config=gate_config,
+        )
+        gate_results.append(initial_gate)
+        if initial_gate.decision == "BLOCK":
+            return ExecutionResult(
+                plan=plan,
+                artifact_ids=[],
+                evidence=[],
+                clustered_adata=adata,
+                step_artifact_ids={},
+                warnings=[f"Pre-execution policy gate BLOCKED: {'; '.join(initial_gate.reasons)}"],
+                needs_review=True,
+                gate_results=gate_results,
+            )
+        if initial_gate.decision == "REVIEW":
+            needs_review = True
+            warnings.append(f"Pre-execution policy gate REVIEW: {'; '.join(initial_gate.reasons)}")
+
     try:
         for step in plan.steps:
+            # Enforce canonical workflow registry dispatch
+            REGISTRY.assert_supported(step.tool_name)
             if step.tool_name == "quality_assessment":
                 result = run_quality_assessment(
                     current,

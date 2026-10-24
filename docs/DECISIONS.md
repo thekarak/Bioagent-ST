@@ -1,3 +1,13 @@
+## 2026-10-24 — Ablation CLI arguments and decoupled report validation (Finding M5)
+
+- **Context:** Claude audit finding M5 reported that ablations could not be run from the CLI and docs/ablations.md was missing.
+- **Decision:**
+  - Authored docs/ablations.md specifying the four baseline modes (full, tool_baseline, schema_baseline, react_baseline) and the four ablation flags (--no-ledger, --no-critic, --no-gating, --no-provenance-constraints).
+  - Wired CLI flags into bioagent-st run-agent via build_agent_config(args) in src/bioagent_st/agent_cli.py and passed the typed AgentConfig to execute_plan(..., config=config).
+  - Decoupled report validation: when provenance_constraints_enabled is False, validate_report() is skipped (allowing hallucination measurement during evaluation replay); when ledger_enabled is False, validate_report() safely skips SQLite evidence lookups while continuing artifact provenance validation, and database connections close cleanly.
+- **Alternatives:** Environment variable flags (rejected: violates non-negotiable that feature flags exist only on AgentConfig schema); separate entrypoints per ablation (rejected: increases maintenance surface and risk of divergence).
+- **Consequences:** All ablations and baselines can be reproduced and evaluated via standard CLI commands using identical model prompts and budgets.
+
 ## 2026-10-24 — Explicit policy gate, workflow registry, and fault-injection harness
 
 - **Context:** Blueprint audit identified four key requirements: (1) explicit policy gate (ALLOW / REVIEW / BLOCK); (2) workflows strictly enforced through an enum-only registry; (3) `AgentConfig` ablation flags; (4) fault-injection test suite for routing robustness.

@@ -47,6 +47,7 @@ def create_spatial_fixture(seed: int = 0) -> AnnData:
         obs=obs,
         var=var,
         obsm={"spatial": spatial},
+        layers={"counts": sparse.csr_matrix(counts)},
     )
     adata.uns["fixture"] = {
         "seed": seed,

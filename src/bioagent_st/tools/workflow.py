@@ -23,11 +23,21 @@ from bioagent_st.analysis.spatial import (
     spatial_statistics,
 )
 from bioagent_st.ledger.provenance_store import ProvenanceStore
+from bioagent_st.schemas.evidence import CheckResult
 from bioagent_st.schemas.provenance import ProvenanceRecord
+from bioagent_st.schemas.registry import REGISTRY
 from bioagent_st.schemas.tools import ToolResult
 from bioagent_st.utils.hashing import anndata_content_hash, sha256_file
 from bioagent_st.utils.ids import new_id
-from bioagent_st.utils.versions import library_versions
+from bioagent_st.utils.versions import git_commit, library_versions
+from bioagent_st.verification.checks import (
+    counts_available_check,
+    duplicate_id_check,
+    min_observation_check,
+    no_nans_check,
+    qc_pass_check,
+    spatial_coordinate_check,
+)
 
 
 def _write_provenance(
@@ -45,7 +55,7 @@ def _write_provenance(
         artifact_id=artifact_id,
         artifact_type=artifact_type,
         dataset_hash=dataset_hash,
-        code_commit="uncommitted",
+        code_commit=git_commit(),
         tool_name=tool_name,
         tool_version="0.1.0",
         library_versions=library_versions(),
@@ -81,8 +91,31 @@ def run_quality_assessment(
     source_hash = dataset_hash or anndata_content_hash(adata)
     owns_store = store is None
     store = store or ProvenanceStore(output / "ledger.db")
+    # 1. Run intrinsic contract & data validation checks
+    checks: list[CheckResult] = [
+        min_observation_check(adata, minimum=max(qc_params.min_cells, 1)),
+        duplicate_id_check(adata),
+        no_nans_check(adata),
+        counts_available_check(adata),
+        spatial_coordinate_check(adata, required=False),
+    ]
+    failing_hard = [c for c in checks if c.severity == "hard" and c.status == "fail"]
+    if failing_hard:
+        reasons = [c.detail or c.check_id for c in failing_hard]
+        if owns_store:
+            store.close()
+        return ToolResult(
+            status="error",
+            artifact_ids=[],
+            metrics={"n_obs": int(adata.n_obs), "n_vars": int(adata.n_vars)},
+            checks=checks,
+            warnings=reasons,
+            error=f"Quality assessment rejected schema: {'; '.join(reasons)}",
+        )
+
     try:
         assessed = assess_quality(adata, qc_params)
+        checks.append(qc_pass_check(assessed))
         qc_path = output / "qc.h5ad"
         assessed.write_h5ad(qc_path, compression="gzip")
         qc_artifact_id = _write_provenance(
@@ -185,6 +218,7 @@ def run_quality_assessment(
                 "spatial_present": str("spatial" in assessed.obsm),
             },
             warnings=missing_fields,
+            checks=checks,
         )
     except Exception as error:
         return ToolResult(status="error", artifact_ids=[], metrics={}, error=str(error))
@@ -246,6 +280,28 @@ def run_spatial_clustering(
     owns_store = store is None
     store = store or ProvenanceStore(output / "ledger.db")
     effective_clustering = _effective_clustering_params(adata, clustering_params)
+
+    # 1. Run intrinsic spatial & data validation checks before allocating outputs
+    spatial_check = spatial_coordinate_check(adata, required=True)
+    dup_check = duplicate_id_check(adata)
+    nan_check = no_nans_check(adata)
+    counts_check = counts_available_check(adata)
+    min_obs_check = min_observation_check(adata, minimum=3)
+    checks: list[CheckResult] = [spatial_check, dup_check, nan_check, counts_check, min_obs_check]
+    failing_hard = [c for c in checks if c.severity == "hard" and c.status == "fail"]
+    if failing_hard:
+        reasons = [c.detail or c.check_id for c in failing_hard]
+        if owns_store:
+            store.close()
+        return ToolResult(
+            status="error",
+            artifact_ids=[],
+            metrics={},
+            checks=checks,
+            warnings=reasons,
+            error=f"Spatial clustering blocked: {'; '.join(reasons)}",
+        )
+
     try:
         base = run_qc_clustering(
             adata,
@@ -404,12 +460,53 @@ def run_gene_expression(
     source_hash = anndata_content_hash(adata)
     owns_store = store is None
     store = store or ProvenanceStore(output / "ledger.db")
+
+    spatial_check = spatial_coordinate_check(adata, required=True)
+    dup_check = duplicate_id_check(adata)
+    nan_check = no_nans_check(adata)
+    counts_check = counts_available_check(adata)
+    checks: list[CheckResult] = [spatial_check, dup_check, nan_check, counts_check]
+    failing_hard = [c for c in checks if c.severity == "hard" and c.status == "fail"]
+    if failing_hard:
+        reasons = [c.detail or c.check_id for c in failing_hard]
+        if owns_store:
+            store.close()
+        return ToolResult(
+            status="error",
+            artifact_ids=[],
+            metrics={},
+            checks=checks,
+            warnings=reasons,
+            error=f"Gene expression blocked: {'; '.join(reasons)}",
+        )
+
+    if params is None:
+        if owns_store:
+            store.close()
+        return ToolResult(
+            status="error",
+            artifact_ids=[],
+            metrics={},
+            checks=checks,
+            error="gene expression parameters are required",
+        )
+
+    selected = params
+    if selected.layer != "X" and selected.layer not in adata.layers:
+        if owns_store:
+            store.close()
+        return ToolResult(
+            status="error",
+            artifact_ids=[],
+            metrics={},
+            checks=checks,
+            error=(
+                f"layer not found: {selected.layer}; available layers: "
+                f"{', '.join(['X', *adata.layers.keys()])}"
+            ),
+        )
+
     try:
-        if params is None:
-            raise ValueError("gene expression parameters are required")
-        selected = params
-        if "spatial" not in adata.obsm:
-            raise ValueError("obsm['spatial'] is required for gene expression plots")
         summaries, vectors = summarize_expression(adata, selected)
         unresolved = [item for item in summaries if item.match != "exact"]
 
@@ -477,7 +574,7 @@ def run_gene_expression(
             autocorr = autocorrelation_table(
                 adata,
                 list(vectors),
-                SpatialParams(n_perms=100, genes=list(vectors), seed=0),
+                SpatialParams(n_perms=100, genes=list(vectors), seed=0, layer=selected.layer),
             )
             autocorr_path = output / "spatial_autocorr.csv"
             autocorr.to_csv(autocorr_path, index=False)
@@ -526,6 +623,19 @@ def run_gene_expression(
                 "unresolved_genes": len(unresolved),
             },
             warnings=warnings,
+            checks=[
+                *checks,
+                CheckResult(
+                    check_id="gene.resolved",
+                    status="pass" if not unresolved else "warn",
+                    severity="soft",
+                    detail=(
+                        "All requested genes resolved exactly"
+                        if not unresolved
+                        else f"{len(unresolved)} genes unresolved"
+                    ),
+                ),
+            ],
         )
     except Exception as error:
         return ToolResult(status="error", artifact_ids=[], metrics={}, error=str(error))
@@ -672,3 +782,8 @@ def run_spatial_statistics(
     finally:
         if owns_store:
             store.close()
+
+
+REGISTRY.register_executor("quality_assessment", run_quality_assessment)
+REGISTRY.register_executor("spatial_clustering", run_spatial_clustering)
+REGISTRY.register_executor("gene_expression", run_gene_expression)
