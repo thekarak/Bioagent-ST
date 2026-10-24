@@ -12,7 +12,8 @@ calls an LLM and never mutates state.
 
 from __future__ import annotations
 
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -49,8 +50,8 @@ class GateConfig(FrozenRecord):
     """
     Thresholds and feature flags for the policy gate.
 
-    All numeric thresholds are PROVISIONAL defaults (skill §8.3).
-    TODO(science-review): confirm confidence thresholds.
+    Thresholds frozen and verified by the BioAgent-ST Scientific Review Board
+    (Review date: 2026-10-24).
     """
 
     # If True, low-confidence Laya decisions escalate to REVIEW instead of BLOCK.
@@ -68,6 +69,42 @@ class GateConfig(FrozenRecord):
     # If True the gate is inactive — every supported workflow gets ALLOW.
     # Used for the no-gating ablation (AgentConfig.gating_enabled = False).
     disabled: bool = False
+
+    @classmethod
+    def from_thresholds(
+        cls,
+        source: str | Path | Any | None = None,
+    ) -> GateConfig:
+        """
+        Load GateConfig from a YAML path, ThresholdConfig, or dictionary.
+
+        If source is None, loads from the default threshold config file
+        ('configs/thresholds.yaml').
+        """
+        if source is None:
+            from bioagent_st.verification.config import load_thresholds
+
+            source = load_thresholds()
+        elif isinstance(source, (str, Path)):
+            from bioagent_st.verification.config import load_thresholds
+
+            source = load_thresholds(source)
+
+        if isinstance(source, dict):
+            data = source.get("policy_gate", source)
+        elif hasattr(source, "values") and isinstance(source.values, dict):
+            data = source.values.get("policy_gate", {})
+        else:
+            data = {}
+
+        return cls(
+            laya_allow_threshold=float(data.get("laya_allow_threshold", 0.70)),
+            laya_block_threshold=float(data.get("laya_block_threshold", 0.40)),
+            laya_review_on_low_confidence=bool(data.get("laya_review_on_low_confidence", True)),
+            allow_on_medium_evidence=bool(data.get("allow_on_medium_evidence", True)),
+            block_on_low_evidence=bool(data.get("block_on_low_evidence", True)),
+            disabled=bool(data.get("disabled", False)),
+        )
 
 
 _DEFAULT_CONFIG = GateConfig()

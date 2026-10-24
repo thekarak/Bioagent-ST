@@ -66,7 +66,7 @@ All performance claims in BioAgent-ST are framed as scientific hypotheses to be 
 
 ## 4. Explicit Non-Claims & Scientific Boundaries
 
-To uphold scientific integrity and prevent scope creep, BioAgent-ST makes the following **explicit non-claims**:
+To uphold scientific integrity and prevent scope creep, BioAgent-ST makes the following **explicit non-claims** (detailed exhaustively with literature citations in [`docs/limitations.md`](file:///c:/Users/sfors/OneDrive/Desktop/BioAgent-st/docs/limitations.md)):
 
 1. **No Claim of Automated Cell-Type Discovery:**
    BioAgent-ST does **not** claim to autonomously identify, annotate, or discover novel cell types without human domain-expert validation. Clusters identified by Leiden or Louvain graph partitioning are mathematical groupings of transcriptional profiles, not validated biological cell types.
@@ -90,3 +90,5 @@ The following operational guardrails are codified in tool definitions, verificat
 * **Visualization is Not Evidence:** Dimension reduction plots (UMAP, t-SNE) are treated strictly as qualitative visualizations and are prohibited from being cited as quantitative evidence.
 * **Multiple Testing Correction:** All high-dimensional gene tests must report effect sizes (log fold change) alongside adjusted p-values (Benjamini-Hochberg FDR).
 * **Transparent Method Limitations:** Every analysis report is programmatically required to enumerate the assumptions, limitations, and failure modes of the utilized algorithms.
+
+For a full methodological and epistemic treatment of technical verification versus biological validity, clustering assumptions, operational thresholds, and routing boundaries, consult the formal limitations document: [`docs/limitations.md`](file:///c:/Users/sfors/OneDrive/Desktop/BioAgent-st/docs/limitations.md).

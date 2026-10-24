@@ -20,6 +20,7 @@ import re
 import statistics
 import time
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from bioagent_st.routing import (
@@ -46,6 +47,8 @@ class BenchmarkCase:
     question: str
     expected: WorkflowId
     category: str
+    id: str = ""
+    rationale: str = ""
 
 
 ROUTING_BENCHMARK: tuple[BenchmarkCase, ...] = (
@@ -445,6 +448,40 @@ ROUTING_BENCHMARK: tuple[BenchmarkCase, ...] = (
 )
 
 
+def load_routing_benchmark(
+    benchmark_path: Path | str | None = None,
+) -> tuple[BenchmarkCase, ...]:
+    """Load the frozen 75-query routing benchmark dataset from disk, falling back to built-in.
+
+    Reads data/benchmark/routing_eval_75.json if present.
+    """
+    if benchmark_path is None:
+        benchmark_path = (
+            Path(__file__).resolve().parent.parent / "data" / "benchmark" / "routing_eval_75.json"
+        )
+    p = Path(benchmark_path)
+    if not p.is_file():
+        return ROUTING_BENCHMARK
+
+    try:
+        with open(p, encoding="utf-8") as f:
+            raw_data = json.load(f)
+        cases: list[BenchmarkCase] = []
+        for item in raw_data:
+            cases.append(
+                BenchmarkCase(
+                    id=item.get("id", ""),
+                    question=item["query"],
+                    expected=item["gold_label"],
+                    category=item.get("category", "unspecified"),
+                    rationale=item.get("rationale", ""),
+                )
+            )
+        return tuple(cases) if cases else ROUTING_BENCHMARK
+    except Exception:
+        return ROUTING_BENCHMARK
+
+
 # ---------------------------------------------------------------------------
 # Fault-injection benchmark
 # ---------------------------------------------------------------------------
@@ -734,9 +771,11 @@ class EvaluationSummary:
 
 def evaluate_selector(
     selector: WorkflowSelector,
-    benchmark: tuple[BenchmarkCase, ...] = ROUTING_BENCHMARK,
+    benchmark: tuple[BenchmarkCase, ...] | None = None,
     name: str = "selector",
 ) -> EvaluationSummary:
+    if benchmark is None:
+        benchmark = load_routing_benchmark()
     summary = EvaluationSummary(
         selector_name=name,
         total_queries=len(benchmark),
@@ -787,11 +826,13 @@ def evaluate_selector(
 
 
 def evaluate_selector_pair(
-    benchmark: tuple[BenchmarkCase, ...],
+    benchmark: tuple[BenchmarkCase, ...] | None = None,
     use_real_laya: bool = False,
     label_suffix: str = "",
 ) -> dict[str, EvaluationSummary]:
     """Run both rules and Laya selectors on *benchmark* side-by-side."""
+    if benchmark is None:
+        benchmark = load_routing_benchmark()
     rules_selector = RuleSelector()
     rules_summary = evaluate_selector(
         rules_selector, benchmark, name=f"Deterministic Rules{label_suffix}"
@@ -812,10 +853,12 @@ def evaluate_selector_pair(
 
 def run_evaluation_harness(
     use_real_laya: bool = False,
-    benchmark: tuple[BenchmarkCase, ...] = ROUTING_BENCHMARK,
+    benchmark: tuple[BenchmarkCase, ...] | None = None,
     include_fault_injection: bool = True,
 ) -> dict[str, EvaluationSummary]:
     results: dict[str, EvaluationSummary] = {}
+    if benchmark is None:
+        benchmark = load_routing_benchmark()
     pair = evaluate_selector_pair(benchmark, use_real_laya=use_real_laya)
     results["rules"] = pair["rules"]
     results["laya"] = pair["laya"]
@@ -984,12 +1027,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate Deterministic Rules vs Laya Router")
     parser.add_argument("--real", action="store_true", help="Run with real Laya model")
     parser.add_argument(
+        "--benchmark", type=str, default=None, help="Path to routing benchmark JSON file"
+    )
+    parser.add_argument(
         "--format", choices=["markdown", "json"], default="markdown", help="Output format"
     )
     parser.add_argument("--output", type=str, default=None, help="Output file path")
     args = parser.parse_args()
 
-    results = run_evaluation_harness(use_real_laya=args.real)
+    bench = load_routing_benchmark(args.benchmark) if args.benchmark else None
+    results = run_evaluation_harness(use_real_laya=args.real, benchmark=bench)
 
     if args.format == "json":
         payload = {key: asdict(summary) for key, summary in results.items()}

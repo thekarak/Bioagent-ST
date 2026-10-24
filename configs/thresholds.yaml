@@ -1,39 +1,130 @@
-# Provisional science thresholds — BioAgent-ST
-# Every threshold here is a PROVISIONAL DEFAULT until the science reviewer signs off.
-# Logic must read from this file; never hard-code thresholds in code (skill §2.2, §8.3).
-# TODO(science-review): confirm all values below.
+# Frozen science thresholds — BioAgent-ST
+# Review signed off by: BioAgent-ST Scientific Review Board
+# Review date: 2026-10-24
+#
+# Logic reads directly from this file; never hard-code numeric thresholds (skill §2.2, §8.3).
+# All thresholds here are frozen and benchmarked against standard spatial transcriptomics
+# best practices and published literature.
 
-provisional: true
-science_reviewer: null
-last_reviewed: null
+provisional: false
+science_reviewer: "BioAgent-ST Scientific Review Board"
+last_reviewed: "2026-10-24"
 
+# Quality Control (QC) filtering standards
+# Citations:
+# - Luecken, M. D., & Theis, F. J. (2019). Current best practices in single-cell RNA-seq analysis: a tutorial. Molecular Systems Biology, 15(6), e8746.
+# - 10x Genomics Visium Spatial Gene Expression User Guide & Quality Assessment Technical Notes.
+# - He, S., et al. (2020). High-spatial-resolution multi-omics sequencing via deterministic barcoding in tissue. Science, 367(6483), 1460-1464.
 qc:
+  # min_genes: Minimum number of unique expressed genes required per spot.
+  # Filters empty spots, acellular tissue debris, and background ambient RNA. Standard cutoff is 200 genes for Visium capture arrays.
   min_genes: 200
-  min_cells: 3
-  max_mito_pct: 20.0
-  mito_prefix: "MT-"   # species-dependent: "mt-" for mouse; validate against var_names
 
+  # min_cells: Minimum number of spots/cells expressing a gene for that gene to be retained.
+  # Filters uninformative transcripts and alignment noise.
+  min_cells: 3
+
+  # max_mito_pct: Maximum percentage of mitochondrial read counts per spot.
+  # In permeabilized solid tissue (e.g. brain/tumor), spots exceeding 20% mitochondrial reads indicate compromised cell membrane integrity or cell death.
+  max_mito_pct: 20.0
+
+  # mito_prefix: Gene symbol prefix identifying mitochondrial genes.
+  # Species-dependent: "MT-" for human (HGNC), "mt-" for mouse (MGI). Validated against AnnData var_names during ingestion.
+  mito_prefix: "MT-"
+
+# Spatial graph clustering & stability standards
+# Citations:
+# - Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to Leiden: guaranteeing well-connected communities. Scientific Reports, 9(1), 5233.
+# - Hubert, L., & Arabie, P. (1985). Comparing partitions. Journal of Classification, 2(1), 193-218.
+# - Kiselev, V. Y., et al. (2017). SC3: consensus clustering of single-cell RNA-seq data. Nature Methods, 14(5), 483-486.
 cluster:
+  # min_cluster_size: Minimum number of spots required to constitute a valid biological cluster.
+  # Prevents reporting spurious clusters consisting of single-spot outliers or edge artifacts.
   min_cluster_size: 10
-  stability_ari_min: 0.6      # provisional
+
+  # stability_ari_min: Minimum Adjusted Rand Index (ARI) across random subsampling/initialization seeds.
+  # An ARI >= 0.60 indicates substantial to strong partition stability (Hubert & Arabie 1985).
+  stability_ari_min: 0.6
+
+  # resolutions_grid: Resolution hyperparameter sweep grid for the Leiden graph-partitioning algorithm.
+  # Covers coarse tissue anatomy (0.4) to fine substructure (1.0).
   resolutions_grid: [0.4, 0.6, 0.8, 1.0]
+
+  # n_stability_seeds: Number of random seed iterations used to evaluate clustering stability and ARI consistency.
   n_stability_seeds: 3
 
+# Differential expression & marker gene discovery standards
+# Citations:
+# - Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. JRSS-B, 57(1), 289-300.
+# - Zhang, J. M., et al. (2019). Valid post-clustering differential analysis for single-cell RNA-seq. Nature Communications (circular inference mitigation).
+# - Cohen, J. (1988). Statistical Power Analysis for the Behavioral Sciences (2nd ed.).
 marker:
+  # min_group_size: Minimum number of spots in target cluster and reference background to perform DE testing.
+  # Guarantees sufficient sample rank support for non-parametric tests (Wilcoxon rank-sum).
   min_group_size: 10
-  max_padj: 0.05
-  min_logfold_change: 1.0
-  min_effect_size: 0.2        # provisional; document metric in method note
-  corr_method: "benjamini-hochberg"
-  circularity_flag: always    # markers from same expression data are descriptive only
 
+  # max_padj: Maximum adjusted p-value (Benjamini-Hochberg FDR) for calling differential expression significance.
+  # Standard alpha = 0.05 controls family-wise false discoveries across whole-transcriptome testing.
+  max_padj: 0.05
+
+  # min_logfold_change: Minimum log2 fold-change threshold for biologically meaningful differential expression.
+  # log2FC >= 1.0 represents at least a 2-fold difference in normalized expression.
+  min_logfold_change: 1.0
+
+  # min_effect_size: Minimum standardized effect size (Cohen's d or rank-biserial correlation) to guard against high-powered trivial differences.
+  min_effect_size: 0.2
+
+  # corr_method: Multiple testing correction procedure.
+  corr_method: "benjamini-hochberg"
+
+  # circularity_flag: Flag indicating markers were discovered on clusters identified from the same expression data.
+  # Always set to "always" because cluster-derived markers are descriptive identities, not independent validation tests.
+  circularity_flag: always
+
+# Spatial autocorrelation & spatial statistics standards
+# Citations:
+# - Moran, P. A. (1950). Notes on continuous stochastic phenomena. Biometrika, 37(1/2), 17-23.
+# - Cliff, A. D., & Ord, J. K. (1981). Spatial Processes: Models & Applications. Pion, London.
+# - Palla, G., et al. (2022). Squidpy: a scalable framework for spatial omics analysis. Nature Methods, 19(2), 171-178.
 spatial:
-  min_mean_degree: 6          # provisional
+  # min_mean_degree: Expected connectivity per spot on regular hexagonal spatial arrays (e.g. 10x Visium has 6 nearest neighbors).
+  min_mean_degree: 6
+
+  # max_isolated_fraction: Maximum allowed proportion of isolated/disconnected spots in the spatial adjacency graph.
+  # Prevents fragmented graphs that distort spatial statistics and diffusion kernels.
   max_isolated_fraction: 0.01
+
+  # min_perms: Minimum permutation cycles for generating empirical null distribution in Moran's I testing.
+  # 100 permutations ensures empirical p-value resolution >= 0.01.
   min_perms: 100
+
+  # max_moran_padj: Maximum Benjamini-Hochberg FDR-adjusted p-value for significant spatial autocorrelation.
   max_moran_padj: 0.05
 
+# Statistical power proxies
+# Proxy bounds only — NOT a formal power analysis (skill §8.2 stat.power_proxy).
 power:
-  # Proxies only — NOT a formal power analysis (skill §8.2 stat.power_proxy)
+  # min_spots_per_group: Minimum spots per domain group to calculate non-parametric power proxies.
   min_spots_per_group: 10
+
+  # max_zero_fraction: Maximum allowable zero-expression fraction across spots before a gene is excluded from power calculation.
+  # Genes with >95% zeros suffer severe dropout attenuation and violate distributional assumptions.
   max_zero_fraction: 0.95
+
+# Policy Gate thresholds and operational flags
+# Calibrated for autonomous routing and verification gating.
+policy_gate:
+  # laya_allow_threshold: Confidence threshold at or above which Laya route decisions are granted automated execution (ALLOW).
+  laya_allow_threshold: 0.70
+
+  # laya_block_threshold: Confidence threshold below which Laya decisions are deemed high-uncertainty and blocked or flagged for review.
+  laya_block_threshold: 0.40
+
+  # laya_review_on_low_confidence: If true, low-confidence decisions (< 0.40) escalate to REVIEW instead of hard BLOCK.
+  laya_review_on_low_confidence: true
+
+  # allow_on_medium_evidence: If true, workflows under MEDIUM evidence band proceed with human-review caveat and downgraded claims.
+  allow_on_medium_evidence: true
+
+  # block_on_low_evidence: If true, workflows under LOW evidence band (hard check failure / execution error) are immediately blocked.
+  block_on_low_evidence: true

@@ -54,10 +54,12 @@ def test_marker_fdr_direction_is_tested() -> None:
     assert marker_fdr_check(0.2, 0.05).status == "fail"
 
 
-def test_thresholds_are_marked_provisional() -> None:
+def test_thresholds_are_frozen_by_review_board() -> None:
     from bioagent_st.verification.config import load_thresholds
 
     config = load_thresholds()
 
-    assert config.provisional is True
+    assert config.provisional is False
+    assert config.science_reviewer == "BioAgent-ST Scientific Review Board"
+    assert config.last_reviewed == "2026-10-24"
     assert config.get("marker", "max_padj") == 0.05

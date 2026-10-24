@@ -196,3 +196,98 @@ class TestGateResultImmutability:
         result = gate_request(dec)
         with pytest.raises((AttributeError, TypeError, ValueError)):
             result.decision = "BLOCK"  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Frozen Thresholds & GateConfig loading
+# ---------------------------------------------------------------------------
+
+
+class TestGateConfigFrozenThresholds:
+    def test_gate_config_defaults_match_frozen_thresholds(self) -> None:
+        cfg = GateConfig()
+        assert cfg.laya_allow_threshold == 0.70
+        assert cfg.laya_block_threshold == 0.40
+        assert cfg.laya_review_on_low_confidence is True
+        assert cfg.allow_on_medium_evidence is True
+        assert cfg.block_on_low_evidence is True
+        assert cfg.disabled is False
+
+    def test_gate_config_from_thresholds_default(self) -> None:
+        cfg = GateConfig.from_thresholds()
+        assert cfg.laya_allow_threshold == 0.70
+        assert cfg.laya_block_threshold == 0.40
+        assert cfg.laya_review_on_low_confidence is True
+        assert cfg.allow_on_medium_evidence is True
+        assert cfg.block_on_low_evidence is True
+
+    def test_gate_config_from_threshold_config_object(self) -> None:
+        from bioagent_st.verification.config import load_thresholds
+
+        threshold_cfg = load_thresholds()
+        assert threshold_cfg.provisional is False
+        assert threshold_cfg.science_reviewer == "BioAgent-ST Scientific Review Board"
+        assert threshold_cfg.last_reviewed == "2026-10-24"
+
+        cfg = threshold_cfg.to_gate_config()
+        assert cfg.laya_allow_threshold == 0.70
+        assert cfg.laya_block_threshold == 0.40
+        assert cfg.laya_review_on_low_confidence is True
+
+    def test_gate_config_from_custom_dict(self) -> None:
+        custom = {
+            "policy_gate": {
+                "laya_allow_threshold": 0.85,
+                "laya_block_threshold": 0.50,
+                "laya_review_on_low_confidence": False,
+                "allow_on_medium_evidence": False,
+                "block_on_low_evidence": True,
+            }
+        }
+        cfg = GateConfig.from_thresholds(custom)
+        assert cfg.laya_allow_threshold == 0.85
+        assert cfg.laya_block_threshold == 0.50
+        assert cfg.laya_review_on_low_confidence is False
+        assert cfg.allow_on_medium_evidence is False
+
+    def test_threshold_contract_validation(self) -> None:
+        from bioagent_st.schemas.contracts import load_threshold_contract
+
+        contract = load_threshold_contract()
+        assert contract.provisional is False
+        assert contract.science_reviewer == "BioAgent-ST Scientific Review Board"
+        assert contract.last_reviewed == "2026-10-24"
+        assert contract.qc.min_genes == 200
+        assert contract.cluster.stability_ari_min == 0.60
+        assert contract.marker.max_padj == 0.05
+        assert contract.marker.circularity_flag == "always"
+        assert contract.spatial.min_mean_degree == 6.0
+        assert contract.spatial.max_moran_padj == 0.05
+        assert contract.power.min_spots_per_group == 10
+        assert contract.policy_gate.laya_allow_threshold == 0.70
+        assert contract.policy_gate.laya_block_threshold == 0.40
+
+    def test_exact_boundary_conditions_with_frozen_thresholds(self) -> None:
+        cfg = GateConfig.from_thresholds()
+
+        # At exactly 0.70 -> ALLOW
+        dec_at_allow = _laya_decision("spatial_clustering", confidence=0.70)
+        assert gate_request(dec_at_allow, config=cfg).decision == "ALLOW"
+
+        # Just below 0.70 (0.699) -> REVIEW
+        dec_sub_allow = _laya_decision("spatial_clustering", confidence=0.699)
+        assert gate_request(dec_sub_allow, config=cfg).decision == "REVIEW"
+
+        # At exactly 0.40 -> REVIEW (since < 0.70 and >= 0.40)
+        dec_at_block = _laya_decision("spatial_clustering", confidence=0.40)
+        assert gate_request(dec_at_block, config=cfg).decision == "REVIEW"
+
+        # Below 0.40 with review enabled -> REVIEW
+        dec_sub_block = _laya_decision("spatial_clustering", confidence=0.399)
+        assert gate_request(dec_sub_block, config=cfg).decision == "REVIEW"
+
+        # Below 0.40 with review disabled -> BLOCK
+        cfg_strict = GateConfig.from_thresholds(
+            {"policy_gate": {"laya_review_on_low_confidence": False}}
+        )
+        assert gate_request(dec_sub_block, config=cfg_strict).decision == "BLOCK"

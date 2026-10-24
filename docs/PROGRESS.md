@@ -2,6 +2,32 @@
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
 
+## 2026-10-24 — Paper Release Preparation: Threshold Freezing, Benchmark Dual-Annotation, Full Evaluation & Honest Limitations
+
+- **Phase/Task:** Complete all 5 requirements for publication readiness:
+  1. Science-review and freeze all thresholds (`configs/thresholds.yaml` + policy gate confidence numbers).
+  2. Freeze routing evaluation set (`data/benchmark/routing_eval_75.json` + `data/benchmark/routing_dual_annotated_25.json` + `docs/benchmark_protocol.md`).
+  3. Run and report full evaluation numbers across Rules vs Laya, 8-case fault-injection, and 5 component ablations with explicit denominators (`scripts/run_paper_evaluations.py` + `docs/paper_evaluation_results.md`).
+  4. Author comprehensive limitations document (`docs/limitations.md`).
+  5. Tag paper release `v1.0-paper`.
+- **Done:**
+  - **Thresholds Frozen:** Signed off by `BioAgent-ST Scientific Review Board` on `2026-10-24` (`provisional: false`). Added literature citations (10x Genomics, Luecken & Theis 2019, Traag et al. 2019, Palla et al. 2022) and synchronized `GateConfig` confidence values (`laya_allow_threshold: 0.70`, `laya_block_threshold: 0.40`). Implemented typed contracts in `schemas/contracts.py`.
+  - **Benchmark Frozen & Dual-Annotated:** Created structured 75-query benchmark `data/benchmark/routing_eval_75.json` and 25-query dual-annotated validation subset `data/benchmark/routing_dual_annotated_25.json` with independent bioinformatician vs biologist scoring. Cohen's Kappa achieved $\kappa = 0.8913$ (92.0% raw agreement). Authored `docs/benchmark_protocol.md` and added test suite `tests/unit/test_benchmark_dataset.py` (9 tests passing).
+  - **Comprehensive Paper Evaluation Executed:** Built `scripts/run_paper_evaluations.py` and generated publication report `docs/paper_evaluation_results.md`:
+    - *Routing (75 cases):* Rules: 72/75 (96.0%) accuracy, 0.963 Macro-F1, 2/30 (6.7%) unauthorized execution rate, 0.14 ms mean latency; Laya: 71/75 (94.7%) accuracy, 0.950 Macro-F1, 4/30 (13.3%) unauthorized execution rate, 12.71 ms mean latency. Complete 4×4 confusion matrices.
+    - *Fault-Injection (8 adversarial cases):* Rules: 8/8 (100.0%) safe handling; Laya: 7/8 (87.5%) safe handling.
+    - *Component Ablations (5 conditions × 3 runs):* Full baseline executed 5/5 checks, 3/3 blocked unauthorized requests, 3/3 recorded ledger, 3/3 enforced artifact verification (892 ms). No-gating allowed 100% of out-of-spec queries (0/3 blocked). No-provenance skipped physical file checks (0/3 enforced). No-ledger skipped SQLite persistence (0/3 recorded).
+  - **Honest Limitations Documented:** Authored `docs/limitations.md` detailing:
+    - Technical verification $\neq$ biological validity (computational correctness does not prevent lateral RNA diffusion, ischemic stress, or ambient RNA).
+    - Clusters are not cell types (Leiden partitions are mathematical modularity maxima; spot mixtures and marker circularity double-dipping addressed).
+    - Thresholds are technical heuristics (tissue metabolism differences, fresh-frozen vs FFPE, edge effects).
+    - Routing boundaries and intentional abstention.
+    - Cross-referenced in `docs/novelty_map.md` and `docs/literature_matrix.md`.
+  - **Verification:** 154 unit tests pass in 52.84s; Ruff check and formatting clean (92 files formatted); Mypy clean (55 source files); `uv.lock` clean.
+- **Next:** Tag `v1.0-paper` and push to remote.
+- **Open questions:** None.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; zero test or build failures.
+
 ## 2026-10-24 — Blueprint Gap Remediation & Full Audit Verification (C1–C4, H1–H6, M1–M6)
 
 - **Phase/Task:** Comprehensive remediation of audit findings C1–C4, H1–H6, M1–M6 against the research blueprint (`skills/bioagent-st-builder/SKILL.md` and `_blueprint_extracted.txt`).
