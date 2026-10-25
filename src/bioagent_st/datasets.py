@@ -60,9 +60,9 @@ def inspect_h5ad(path: str | Path, dataset_id: str | None = None) -> DatasetInsp
     unique_obs = bool(adata.obs_names.is_unique)
     unique_var = bool(adata.var_names.is_unique)
     if not unique_obs:
-        warnings.append("observation names not unique; will be deduplicated on load")
+        errors.append("observation names are not unique")
     if not unique_var:
-        warnings.append("gene names not unique; will be deduplicated on load")
+        errors.append("gene names are not unique")
     if adata.n_obs < 3:
         errors.append("fewer than 3 observations")
     if adata.n_vars < 1:

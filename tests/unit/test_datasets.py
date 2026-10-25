@@ -119,13 +119,7 @@ def test_inspect_h5ad_duplicate_var_names_flagged(tmp_path: Path) -> None:
     adata.write_h5ad(path)
 
     inspection = inspect_h5ad(path)
-    assert inspection.errors == []
-    assert any(
-        "gene names not unique; will be deduplicated on load" in w for w in inspection.warnings
-    )
-
-    loaded = load_dataset("user", path)
-    assert loaded.var_names.is_unique
+    assert "gene names are not unique" in inspection.errors
 
 
 def test_inspect_h5ad_duplicate_obs_names_flagged(tmp_path: Path) -> None:
@@ -135,11 +129,4 @@ def test_inspect_h5ad_duplicate_obs_names_flagged(tmp_path: Path) -> None:
     adata.write_h5ad(path)
 
     inspection = inspect_h5ad(path)
-    assert inspection.errors == []
-    assert any(
-        "observation names not unique; will be deduplicated on load" in w
-        for w in inspection.warnings
-    )
-
-    loaded = load_dataset("user", path)
-    assert loaded.obs_names.is_unique
+    assert "observation names are not unique" in inspection.errors
