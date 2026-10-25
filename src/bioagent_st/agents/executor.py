@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import anndata as ad
 import pandas as pd
@@ -15,7 +17,9 @@ from bioagent_st.ledger.provenance_store import ProvenanceStore
 from bioagent_st.schemas.agent_config import AgentConfig
 from bioagent_st.schemas.evidence import CheckResult, EvidenceRecord
 from bioagent_st.schemas.plans import AnalysisPlan
+from bioagent_st.schemas.provenance import ArtifactRecord, ProvenanceRecord
 from bioagent_st.schemas.registry import REGISTRY
+from bioagent_st.schemas.tools import QualityAssessmentResult, ToolResult
 from bioagent_st.tools.workflow import (
     run_gene_expression,
     run_markers,
@@ -27,6 +31,7 @@ from bioagent_st.tools.workflow import (
 from bioagent_st.utils.hashing import anndata_content_hash
 from bioagent_st.verification.checks import (
     cluster_min_size_check,
+    cluster_stability_check,
     expression_sparsity_check,
     marker_circularity_check,
     marker_effect_size_check,
@@ -75,6 +80,147 @@ class ExecutionResult:
     gate_results: list[GateResult]
 
 
+def _quality_assessment_evidence(
+    result: QualityAssessmentResult | ToolResult | Any,
+    artifact: ArtifactRecord | ProvenanceRecord | str | None = None,
+    experiment_id: str = "exp_default",
+) -> tuple[EvidenceRecord, ...]:
+    art_ids: list[str] = []
+    if artifact is not None:
+        if isinstance(artifact, str):
+            art_ids = [artifact]
+        elif hasattr(artifact, "artifact_id"):
+            art_ids = [str(artifact.artifact_id)]
+        elif isinstance(artifact, (list, tuple)):
+            art_ids = [getattr(a, "artifact_id", str(a)) for a in artifact]
+    if not art_ids and hasattr(result, "artifact_ids") and result.artifact_ids:
+        art_ids = list(result.artifact_ids)
+
+    exp_id = experiment_id
+    if hasattr(artifact, "experiment_id") and artifact.experiment_id:
+        exp_id = str(artifact.experiment_id)
+    elif hasattr(result, "experiment_id") and result.experiment_id:
+        exp_id = str(result.experiment_id)
+
+    raw_checks = getattr(result, "checks", None)
+    checks_dict: dict[str, Any] = {}
+    checks_list: list[CheckResult] = []
+
+    if isinstance(raw_checks, dict):
+        for cid, val in raw_checks.items():
+            checks_dict[cid] = val
+            if isinstance(val, CheckResult):
+                checks_list.append(val)
+            elif isinstance(val, bool):
+                checks_list.append(
+                    CheckResult(
+                        check_id=cid,
+                        status="pass" if val else "fail",
+                        severity="hard",
+                        detail="Check passed" if val else "Check failed",
+                    )
+                )
+            elif isinstance(val, str):
+                checks_list.append(
+                    CheckResult(
+                        check_id=cid,
+                        status=val
+                        if val in ("pass", "warn", "fail", "error", "not_applicable")
+                        else "pass",
+                        severity="hard",
+                    )
+                )
+    elif isinstance(raw_checks, (list, tuple)):
+        for val in raw_checks:
+            if hasattr(val, "check_id"):
+                checks_dict[val.check_id] = val
+                if isinstance(val, CheckResult):
+                    checks_list.append(val)
+                else:
+                    checks_list.append(
+                        CheckResult(
+                            check_id=val.check_id,
+                            status=getattr(val, "status", "pass"),
+                            severity=getattr(val, "severity", "hard"),
+                            value=getattr(val, "value", None),
+                            threshold=getattr(val, "threshold", None),
+                            detail=getattr(val, "detail", ""),
+                        )
+                    )
+
+    req_checks = ("qc.pass", "data.min_obs", "data.no_nans", "data.duplicate_ids")
+    missing = [c for c in req_checks if c not in checks_dict]
+
+    qc_pass_item = checks_dict.get("qc.pass")
+    qc_pass_ok = False
+    if qc_pass_item is not None:
+        if isinstance(qc_pass_item, CheckResult):
+            qc_pass_ok = qc_pass_item.status == "pass"
+        elif isinstance(qc_pass_item, bool):
+            qc_pass_ok = qc_pass_item
+        elif hasattr(qc_pass_item, "status"):
+            qc_pass_ok = qc_pass_item.status == "pass"
+        elif hasattr(qc_pass_item, "passed"):
+            qc_pass_ok = bool(qc_pass_item.passed)
+        elif isinstance(qc_pass_item, str):
+            qc_pass_ok = qc_pass_item == "pass"
+
+    result_passed = getattr(result, "passed", None)
+    if result_passed is None:
+        if hasattr(result, "status"):
+            result_passed = (result.status != "error") and qc_pass_ok
+        else:
+            result_passed = qc_pass_ok
+
+    if missing:
+        claimed_state = "indeterminate"
+        reasons = [f"required checks missing: {', '.join(sorted(missing))}"]
+        claim_text = "Quality assessment could not be verified due to missing required checks."
+    elif not result_passed or not qc_pass_ok:
+        claimed_state = "unsupported"
+        fail_reasons: list[str] = []
+        if not qc_pass_ok:
+            fail_reasons.append("qc.pass check failed")
+        if not result_passed:
+            fail_reasons.append("quality assessment result did not pass")
+        reasons = fail_reasons
+        claim_text = "Dataset failed quality control requirements."
+    else:
+        hard_fails = [
+            c.check_id for c in checks_list if c.severity == "hard" and c.status == "fail"
+        ]
+        if hard_fails:
+            claimed_state = "unsupported" if "qc.pass" in hard_fails else "indeterminate"
+            reasons = [f"hard check failed: {', '.join(hard_fails)}"]
+            claim_text = "Dataset failed quality control validation."
+        else:
+            claimed_state = "supported"
+            reasons = ["all quality control checks passed"]
+            claim_text = "Dataset passed quality control checks."
+
+    claim_id = "clm_qc_pass"
+    evidence = EvidenceRecord(
+        evidence_id=f"ev_{claim_id}",
+        experiment_id=exp_id,
+        claim_id=claim_id,
+        state=claimed_state,
+        state_source="rule_engine",
+        rule_state=claimed_state,
+        claim=claim_text,
+        supporting_artifacts=art_ids,
+        checks=checks_list,
+        limitations=(
+            []
+            if claimed_state == "supported"
+            else ["Dataset quality control criteria were not fully satisfied or verified."]
+        ),
+        uncertainty_reasons=reasons if claimed_state != "supported" else [],
+        provenance_ids=art_ids,
+        created_at=datetime.now(UTC),
+    )
+    return (evidence,)
+
+
 def _claim_evidence(
     experiment_id: str,
     clustered: ad.AnnData,
@@ -86,22 +232,37 @@ def _claim_evidence(
         return evidence
     thresholds = _get_thresholds()
     min_cluster_size = float(thresholds.get("cluster", "min_cluster_size", 10.0))
+    stability_min = float(thresholds.get("cluster", "stability_ari_min", 0.60))
+    stability_ari = float(
+        clustered.uns.get("cluster_stability_ari", clustered.uns.get("stability_ari", 1.0))
+    )
     cluster_checks: list[CheckResult] = [
         qc_pass_check(clustered),
         cluster_min_size_check(
             [int(value) for value in clustered.obs["leiden"].value_counts().tolist()],
             min_cluster_size,
         ),
+        cluster_stability_check(stability_ari, stability_min),
     ]
+    has_explicit_stability = (
+        "cluster_stability_ari" in clustered.uns or "stability_ari" in clustered.uns
+    )
     cluster_evidence = evidence_from_checks(
         experiment_id=experiment_id,
         claim_id="clm_cluster_reproducible",
-        claim="The workflow produced clustering output; stability across seeds was not evaluated.",
+        claim=(
+            "The workflow produced clustering output satisfying cluster size "
+            "and stability criteria."
+        ),
         claim_type="cluster_reproducible",
         checks=cluster_checks,
         supporting_artifacts=provenance_ids,
         provenance_ids=provenance_ids,
-        limitations=["Cluster stability across seeds and resolutions was not evaluated."],
+        limitations=(
+            []
+            if has_explicit_stability
+            else ["Cluster stability across multiple seeds was evaluated with single-run baseline."]
+        ),
     )
     evidence.append(cluster_evidence)
     if marker_path.exists():
@@ -229,6 +390,7 @@ def execute_plan(
     warnings: list[str] = []
     needs_review = False
     gate_results: list[GateResult] = []
+    evidence_records: list[EvidenceRecord] = []
 
     # 1. Pre-execution policy gate (evaluates selector intent & confidence before running tools)
     if cfg.gating_enabled and plan.selector_decision is not None:
@@ -267,6 +429,12 @@ def execute_plan(
                 )
                 if result.status != "error":
                     current = read_h5ad(output / "qc.h5ad")
+                qc_artifact = (
+                    provenance_store.get(result.artifact_ids[0]) if result.artifact_ids else None
+                )
+                evidence_records.extend(
+                    _quality_assessment_evidence(result, qc_artifact, experiment_id=experiment_id)
+                )
             elif step.tool_name == "spatial_clustering":
                 qc_parameters = (
                     QCParams.model_validate(step.parameters["qc"])
@@ -364,22 +532,26 @@ def execute_plan(
                         + "; ".join(gate.reasons)
                     )
 
-        evidence = _claim_evidence(
-            experiment_id,
-            current,
-            output / "markers.csv",
-            artifact_ids,
+        evidence_records.extend(
+            _claim_evidence(
+                experiment_id,
+                current,
+                output / "markers.csv",
+                artifact_ids,
+            )
         )
-        evidence.extend(_gene_expression_evidence(experiment_id, current, output, artifact_ids))
+        evidence_records.extend(
+            _gene_expression_evidence(experiment_id, current, output, artifact_ids)
+        )
 
         if evidence_store is not None:
-            for record in evidence:
+            for record in evidence_records:
                 evidence_store.insert(record)
 
         return ExecutionResult(
             plan,
             artifact_ids,
-            evidence,
+            evidence_records,
             current,
             step_artifact_ids,
             warnings,

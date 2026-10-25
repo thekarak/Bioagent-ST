@@ -20,7 +20,7 @@ def test_user_h5ad_passes_shared_validator(tmp_path) -> None:
     assert "domain_truth" in inspection.label_columns
 
 
-def test_missing_spatial_coordinates_are_rejected(tmp_path) -> None:
+def test_missing_spatial_coordinates_produces_warning(tmp_path) -> None:
     adata = create_spatial_fixture()
     del adata.obsm["spatial"]
     path = tmp_path / "no_spatial.h5ad"
@@ -28,9 +28,13 @@ def test_missing_spatial_coordinates_are_rejected(tmp_path) -> None:
 
     inspection = inspect_h5ad(path)
 
-    assert "obsm['spatial'] is required" in inspection.errors
-    with pytest.raises(ValueError, match="spatial"):
-        load_dataset("user", path)
+    assert (
+        "obsm['spatial'] missing; required for spatial clustering and spatial autocorrelation"
+        in inspection.warnings
+    )
+    assert inspection.errors == []
+    loaded = load_dataset("user", path)
+    assert isinstance(loaded, AnnData)
 
 
 def test_duplicate_gene_names_are_rejected(tmp_path) -> None:

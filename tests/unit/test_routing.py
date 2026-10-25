@@ -116,3 +116,47 @@ def test_routing_evaluation_harness_with_fake_predictor() -> None:
     assert laya.abstentions >= 1
     assert laya.error_count == 0
     assert laya.mean_latency_ms > 0.0
+
+
+def test_local_laya_predictor_predicts_all_categories() -> None:
+    from bioagent_st.routing import LocalLayaPredictor
+
+    predictor = LocalLayaPredictor()
+
+    pred_qc = predictor.predict("Assess the quality and schema of this dataset")
+    assert pred_qc.label == "quality_assessment"
+    assert 0.90 <= pred_qc.confidence <= 0.96
+    assert abs(sum(pred_qc.probabilities.values()) - 1.0) < 1e-3
+    assert pred_qc.probabilities["unsupported"] == pred_qc.probabilities["unsupported_or_ambiguous"]
+
+    pred_clust = predictor.predict("Run Leiden clustering and project spots onto a UMAP embedding")
+    assert pred_clust.label == "spatial_clustering"
+    assert 0.90 <= pred_clust.confidence <= 0.96
+
+    pred_expr = predictor.predict("Show spatial expression of GENE_0000 across the tissue")
+    assert pred_expr.label == "gene_expression"
+    assert 0.90 <= pred_expr.confidence <= 0.96
+
+    pred_abst = predictor.predict("Recommend chemotherapy treatment regimen for this patient")
+    assert pred_abst.label == "unsupported_or_ambiguous"
+    assert pred_abst.confidence >= 0.90
+
+
+def test_local_laya_predictor_calibrated_confidence_ambiguous() -> None:
+    from bioagent_st.routing import LocalLayaPredictor
+
+    predictor = LocalLayaPredictor()
+    pred = predictor.predict("Run quality control and perform Leiden clustering")
+    assert pred.label == "unsupported_or_ambiguous"
+    assert 0.45 <= pred.confidence <= 0.65
+
+
+def test_laya_selector_default_offline_mode() -> None:
+    selector = LayaSelector(fallback_to_rules=False)
+    decision = selector.select("Cluster spots by spatial domain and compute marker genes.")
+
+    assert decision.kind == "laya"
+    assert decision.decision == "spatial_clustering"
+    assert decision.confidence is not None and decision.confidence >= 0.85
+    assert len(decision.probabilities) >= 4
+    assert "spatial_clustering" in decision.notes or "Local Laya" in decision.notes

@@ -186,10 +186,10 @@ def run_quality_assessment(
                 "tool_version": "0.1.0",
                 "dataset_hash": source_hash,
                 "parameters": qc_params.model_dump(),
-                "artifact_ids": [
-                    qc_artifact_id,
-                    table_artifact_id,
-                    schema_artifact_id,
+                "artifacts": [
+                    {"name": "qc.h5ad", "sha256": sha256_file(qc_path)},
+                    {"name": "qc_table.csv", "sha256": sha256_file(table_path)},
+                    {"name": "schema_report.json", "sha256": sha256_file(schema_path)},
                 ],
             },
         )
@@ -378,11 +378,12 @@ def run_spatial_clustering(
                 "dataset_hash": source_hash,
                 "qc_parameters": (qc_params or QCParams()).model_dump(),
                 "clustering_parameters": effective_clustering.model_dump(),
-                "artifact_ids": [
-                    *base.artifact_ids,
-                    table_artifact_id,
-                    umap_artifact_id,
-                    plot_artifact_id,
+                "artifacts": [
+                    {"name": "qc.h5ad", "sha256": sha256_file(output / "qc.h5ad")},
+                    {"name": "clustered.h5ad", "sha256": sha256_file(output / "clustered.h5ad")},
+                    {"name": "cluster_table.csv", "sha256": sha256_file(table_path)},
+                    {"name": "umap_coords.csv", "sha256": sha256_file(umap_path)},
+                    {"name": "spatial_clusters.png", "sha256": sha256_file(plot_path)},
                 ],
             },
         )
@@ -590,16 +591,29 @@ def run_gene_expression(
             )
             artifact_ids.append(autocorr_artifact_id)
 
+        artifacts_manifest = [
+            {"name": "gene_match_report.csv", "sha256": sha256_file(match_path)},
+            {"name": "expression_summary.csv", "sha256": sha256_file(summary_path)},
+            {"name": "expression_values.csv", "sha256": sha256_file(values_path)},
+        ]
+        if vectors:
+            artifacts_manifest.extend(
+                [
+                    {"name": "spatial_expression.png", "sha256": sha256_file(plot_path)},
+                    {"name": "spatial_autocorr.csv", "sha256": sha256_file(autocorr_path)},
+                ]
+            )
+
         manifest_path = output / "manifest.json"
         _write_json(
             manifest_path,
             {
-                "tool_name": "gene_expression",
-                "tool_version": "0.1.0",
+                "artifacts": artifacts_manifest,
                 "dataset_hash": source_hash,
                 "parameters": selected.model_dump(),
-                "resolved_genes": list(vectors),
-                "artifact_ids": artifact_ids,
+                "resolved_genes": sorted(vectors),
+                "tool_name": "gene_expression",
+                "tool_version": "0.1.0",
             },
         )
         manifest_artifact_id = _write_provenance(

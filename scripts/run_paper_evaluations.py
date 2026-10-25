@@ -421,7 +421,12 @@ def run_component_ablation_experiments(n_runs: int = 10) -> list[AblationTrialRe
     return results
 
 
-def format_full_paper_markdown(eval_data: FullPaperEvaluation) -> str:
+def format_full_paper_markdown(
+    eval_data: FullPaperEvaluation,
+    *,
+    title: str = "BioAgent-ST: Comprehensive Paper Evaluation & Ablation Benchmark Results",
+    badge: str = "Publication Benchmark Report",
+) -> str:
     """Format comprehensive evaluation and ablation report in GitHub-flavored Markdown."""
     rules = eval_data.routing_results["rules"]
     laya = eval_data.routing_results["laya"]
@@ -476,9 +481,9 @@ def format_full_paper_markdown(eval_data: FullPaperEvaluation) -> str:
     )
 
     lines = [
-        "# BioAgent-ST: Comprehensive Paper Evaluation & Ablation Benchmark Results",
+        f"# {title}",
         "",
-        "> **Publication Benchmark Report**  ",
+        f"> **{badge}**  ",
         f"> **Generated:** {time.strftime('%Y-%m-%d %H:%M:%SZ', time.gmtime())}  ",
         "> **Datasets:** DLPFC 10x Visium (`151673`), Synthetic Spatial Ground Truth "
         "(`n_obs=300`, `n_genes=500`)  ",
@@ -718,6 +723,8 @@ def format_full_paper_markdown(eval_data: FullPaperEvaluation) -> str:
             f"{r.notes} |"
         )
 
+    n_runs = eval_data.metadata.get("runs_per_ablation", 5)
+
     lines.extend(
         [
             "",
@@ -727,17 +734,17 @@ def format_full_paper_markdown(eval_data: FullPaperEvaluation) -> str:
             "- **All Safeguards Active:** Executes 100% of required statistical and contract "
             "checks (5/5).",
             "- **Pre-Execution Gating:** Correctly halts out-of-spec requests "
-            "(`10/10 [100.0%] Blocked`), preventing wasted compute and unauthorized "
+            f"(`{n_runs}/{n_runs} [100.0%] Blocked`), preventing wasted compute and unauthorized "
             "tool execution.",
             "- **Audit Persistence:** Commits all intermediate claims and checks into SQLite "
-            "`ledger.db` (`10/10 [100.0%] Recorded`).",
+            f"`ledger.db` (`{n_runs}/{n_runs} [100.0%] Recorded`).",
             "- **Integrity Verification:** Enforces physical file presence and cryptographic "
-            "SHA-256 byte verification (`10/10 [100.0%] Enforced`).",
+            f"SHA-256 byte verification (`{n_runs}/{n_runs} [100.0%] Enforced`).",
             "",
             "### 6.2 Ablation: No Policy Gating (`--no-gating`)",
             "- **Failure Mode:** When gating is disabled (`gating_enabled=False`), the policy gate "
             "returns `ALLOW` indiscriminately. Out-of-spec or unapproved queries are permitted to "
-            "execute tools (`0/10 [0.0%] Blocked, 100% Allowed`), violating the safety envelope "
+            f"execute tools (`0/{n_runs} [0.0%] Blocked, 100% Allowed`), violating the safety envelope "
             "and executing compute on unanswerable requests.",
             "- **Conclusion:** Policy gating provides the critical defense-in-depth boundary "
             "against unauthorized tool execution.",
@@ -751,7 +758,7 @@ def format_full_paper_markdown(eval_data: FullPaperEvaluation) -> str:
             "",
             "### 6.4 Ablation: No SQLite Ledger (`--no-ledger`)",
             "- **Failure Mode:** Claims are generated in volatile memory but never persisted to "
-            "disk (`0/10 [0.0%] Recorded`). External auditors or post-hoc analysis cannot inspect "
+            f"disk (`0/{n_runs} [0.0%] Recorded`). External auditors or post-hoc analysis cannot inspect "
             "the exact evidence IDs or statistical checks underpinning scientific conclusions.",
             "- **Conclusion:** SQLite ledger persistence ensures non-volatile reproducibility and "
             "forensic auditability.",
@@ -808,6 +815,12 @@ def main() -> None:
         default=_REPO_ROOT / "docs" / "paper_evaluation_results.md",
         help="Output file path (default: docs/paper_evaluation_results.md)",
     )
+    parser.add_argument(
+        "--realtime-output",
+        type=Path,
+        default=_REPO_ROOT / "docs" / "realtime_benchmark_results.md",
+        help="Realtime output file path (default: docs/realtime_benchmark_results.md)",
+    )
     args = parser.parse_args()
 
     print("=====================================================================")
@@ -859,14 +872,34 @@ def main() -> None:
             "ablations": [asdict(a) for a in ablation_results],
         }
         output_content = json.dumps(payload, indent=2)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(output_content, encoding="utf-8")
+        if args.realtime_output:
+            args.realtime_output.parent.mkdir(parents=True, exist_ok=True)
+            args.realtime_output.write_text(output_content, encoding="utf-8")
     else:
-        output_content = format_full_paper_markdown(eval_data)
+        output_content = format_full_paper_markdown(
+            eval_data,
+            title="BioAgent-ST: Comprehensive Paper Evaluation & Ablation Benchmark Results",
+            badge="Publication Benchmark Report",
+        )
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(output_content, encoding="utf-8")
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(output_content, encoding="utf-8")
+        if args.realtime_output:
+            realtime_content = format_full_paper_markdown(
+                eval_data,
+                title="BioAgent-ST: Realtime Benchmark & Evaluation Results",
+                badge="Realtime Live Execution Benchmark Report",
+            )
+            args.realtime_output.parent.mkdir(parents=True, exist_ok=True)
+            args.realtime_output.write_text(realtime_content, encoding="utf-8")
+
     print("\n=====================================================================")
     print("  Evaluation complete! Report written to:")
     print(f"  {args.output.resolve()}")
+    if args.realtime_output:
+        print(f"  {args.realtime_output.resolve()}")
     print("=====================================================================")
 
 

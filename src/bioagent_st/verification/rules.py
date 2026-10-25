@@ -8,6 +8,7 @@ from bioagent_st.verification.config import ThresholdConfig
 
 CONTRADICTING_CHECKS = frozenset(
     {
+        "qc.pass",
         "marker.effect_size",
         "marker.fdr",
         "spatial.enrichment_vs_null",

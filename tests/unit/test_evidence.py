@@ -47,3 +47,66 @@ def test_marker_claim_records_circularity_limitation() -> None:
     assert evidence.state == "supported"
     assert evidence.limitations
     assert evidence.checks[-1].check_id == "marker.circularity_flag"
+
+
+def test_qc_pass_claim_supported_when_all_checks_pass() -> None:
+    checks = [
+        CheckResult(check_id="qc.pass", status="pass", severity="hard"),
+        CheckResult(check_id="data.min_obs", status="pass", severity="hard"),
+        CheckResult(check_id="data.no_nans", status="pass", severity="hard"),
+        CheckResult(check_id="data.duplicate_ids", status="pass", severity="hard"),
+    ]
+
+    evidence = evidence_from_checks(
+        experiment_id="exp_001",
+        claim_id="clm_qc_pass",
+        claim="Dataset passed quality control checks.",
+        claim_type="qc_pass",
+        checks=checks,
+        supporting_artifacts=["art_qc_001"],
+        provenance_ids=["art_qc_001"],
+    )
+
+    assert evidence.state == "supported"
+    assert evidence.rule_state == "supported"
+    assert evidence.state_source == "rule_engine"
+
+
+def test_qc_pass_claim_unsupported_when_qc_pass_fails() -> None:
+    checks = [
+        CheckResult(check_id="qc.pass", status="fail", severity="hard"),
+        CheckResult(check_id="data.min_obs", status="pass", severity="hard"),
+        CheckResult(check_id="data.no_nans", status="pass", severity="hard"),
+        CheckResult(check_id="data.duplicate_ids", status="pass", severity="hard"),
+    ]
+
+    evidence = evidence_from_checks(
+        experiment_id="exp_001",
+        claim_id="clm_qc_pass",
+        claim="Dataset failed quality control requirements.",
+        claim_type="qc_pass",
+        checks=checks,
+        supporting_artifacts=["art_qc_001"],
+        provenance_ids=["art_qc_001"],
+    )
+
+    assert evidence.state == "unsupported"
+
+
+def test_qc_pass_claim_indeterminate_when_required_check_missing() -> None:
+    checks = [
+        CheckResult(check_id="qc.pass", status="pass", severity="hard"),
+        CheckResult(check_id="data.min_obs", status="pass", severity="hard"),
+    ]
+
+    evidence = evidence_from_checks(
+        experiment_id="exp_001",
+        claim_id="clm_qc_pass",
+        claim="Dataset quality indeterminate.",
+        claim_type="qc_pass",
+        checks=checks,
+        supporting_artifacts=["art_qc_001"],
+        provenance_ids=["art_qc_001"],
+    )
+
+    assert evidence.state == "indeterminate"

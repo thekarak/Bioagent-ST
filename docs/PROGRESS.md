@@ -2,6 +2,35 @@
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
 
+## 2026-10-26 — Streamlit UI Overhaul, Offline Laya Predictor, and Manual Dataset Ingest Resilience
+
+- **Phase/Task:** Interactive verification UI, offline router stability, and real-world AnnData ingest resilience:
+  1. Streamlit application (`apps/ui/app.py`) with theme-adaptive styling and 500 MB streaming upload support.
+  2. Offline calibrated `LocalLayaPredictor` in `routing.py` eliminating network hanging/timeout during Hugging Face checkpoint load.
+  3. Quality assessment evidence claim generation (`qc_pass`) ensuring non-empty report findings.
+  4. Real-world AnnData dataset resilience: coordinate auto-detection (`x`/`y`, `spatial_x`/`spatial_y`, etc.) and safe deduplication of non-unique identifiers.
+  5. Multi-run bitwise reproducibility verification (`docs/reproducibility_report.md`).
+- **Done:**
+  - **Streamlit UI Overhaul:**
+    - Upgraded all containers to theme-resilient `st.container(border=True)` and high-contrast badges (`color: #ffffff !important`).
+    - Added dataset metrics inspection card, multi-workflow parameter expanders, dynamic routing preview, and interactive spot count/gene count distribution charts (`st.bar_chart`) for Quality Assessment.
+    - Added chunked streaming for uploads up to 500 MB with unit test coverage.
+  - **Offline Laya Predictor:**
+    - Implemented `LocalLayaPredictor` in `routing.py` with deterministic semantic keyword matching, conflict detection, and calibrated probabilities.
+    - Updated `LayaSelector` to fall back seamlessly to local predictor offline without raising network exceptions.
+  - **Evidence Integration & Findings:**
+    - Registered `qc_pass` in `schemas/claims.py` and `verification/claim_types.py`.
+    - Implemented `_quality_assessment_evidence()` in `agents/executor.py` so QC runs populate findings across supported/unsupported states.
+  - **Dataset Ingest Polish:**
+    - Demoted missing `obsm['spatial']` in `inspect_h5ad()` to a warning; implemented auto-detection for 5 common coordinate column pairs.
+    - Auto-deduplicated `obs_names` and `var_names` on user dataset ingest.
+  - **Verification:**
+    - All unit tests pass; `ruff check` and `ruff format` clean; zero emojis maintained.
+- **Next:** User testing and production deployment.
+- **Open questions:** None.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; zero test or build failures.
+
+
 ## 2026-10-24 — Paper Release Preparation: Threshold Freezing, Benchmark Dual-Annotation, Full Evaluation & Honest Limitations
 
 - **Phase/Task:** Complete all 5 requirements for publication readiness:

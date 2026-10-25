@@ -1,7 +1,7 @@
 # BioAgent-ST: Comprehensive Paper Evaluation & Ablation Benchmark Results
 
 > **Publication Benchmark Report**  
-> **Generated:** 2026-10-24 11:54:16Z  
+> **Generated:** 2026-10-25 11:14:40Z  
 > **Datasets:** DLPFC 10x Visium (`151673`), Synthetic Spatial Ground Truth (`n_obs=300`, `n_genes=500`)  
 > **Methodology:** Deterministic Rule Engine, Laya LLM Router, Five-State Evidence Ledger, Policy Gating, and Dual-Loop Verifier-Critic.  
 
@@ -20,9 +20,9 @@ Evaluation on the frozen **75-query standardized spatial transcriptomics benchma
 | **Abstention Recall** | 28/30 (93.3%) | 26/30 (86.7%) | Sensitivity: fraction of all out-of-scope queries successfully caught |
 | **Unauthorized Execution Rate** | **2/30 (6.7%)** | **4/30 (13.3%)** | Safety hazard rate: improper execution on clinical/unanswerable requests (lower is safer) |
 | **Runtime Exceptions / Crashes** | 0/75 (0.0%) | 0/75 (0.0%) | Total unhandled runtime errors or crashes across evaluation |
-| **Mean Latency** | 0.14 ms | 12.64 ms | Average routing latency per question |
-| **Median Latency** | 0.14 ms | 12.60 ms | 50th percentile routing latency |
-| **P95 Latency** | 0.20 ms | 13.05 ms | 95th percentile worst-case routing latency |
+| **Mean Latency** | 0.19 ms | 12.77 ms | Average routing latency per question |
+| **Median Latency** | 0.16 ms | 12.71 ms | 50th percentile routing latency |
+| **P95 Latency** | 0.30 ms | 13.28 ms | 95th percentile worst-case routing latency |
 
 ---
 
@@ -115,26 +115,26 @@ Evaluation across **8 adversarial, malformed, and edge-case inputs** designed to
 
 ## 6. Component Ablation Experiments
 
-Empirical ablation evaluating the exact contribution of each architectural safeguard across **10/10 runs** repeated executions. Each condition isolates one specific component to quantify its role in scientific safety, auditability, and execution integrity.
+Empirical ablation evaluating the exact contribution of each architectural safeguard across **5/5 runs** repeated executions. Each condition isolates one specific component to quantify its role in scientific safety, auditability, and execution integrity.
 
 | Experimental Condition | Configuration Flag | Verification Checks Executed | Policy Gate on Out-of-Spec Input | SQLite Evidence Persistence | Report Artifact Hash Validation | Mean Execution Latency (ms) | Architectural Role |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| **Baseline (Full System)** | `(default)` | 5/5 (100.0%) | 10/10 (100.0%) [Blocked] | 10/10 (100.0%) [Recorded] | 10/10 (100.0%) [Enforced] | **670.3 ± 294.0** | Full multi-layered safeguard pipeline active. |
-| **No Policy Gating** | `--no-gating` | 5/5 (100.0%) | 0/10 (0.0%) [Allowed] | 10/10 (100.0%) [Recorded] | 10/10 (100.0%) [Enforced] | **591.2 ± 73.7** | Policy gate returns ALLOW for all requests; out-of-spec input allowed. |
-| **No Provenance Constraints** | `--no-provenance-constraints` | 5/5 (100.0%) | 10/10 (100.0%) [Blocked] | 10/10 (100.0%) [Recorded] | 0/10 (0.0%) [Skipped] | **575.2 ± 47.9** | Report validator bypasses physical file presence and SHA-256 byte checks. |
-| **No SQLite Ledger** | `--no-ledger` | 5/5 (100.0%) | 10/10 (100.0%) [Blocked] | 0/10 (0.0%) [Skipped] | 10/10 (100.0%) [Enforced] | **582.1 ± 49.4** | Evidence records generated in memory but not persisted to SQLite ledger.db. |
-| **No Critic** | `--no-critic` | 5/5 (100.0%) | 10/10 (100.0%) [Blocked] | 10/10 (100.0%) [Recorded] | 10/10 (100.0%) [Enforced] | **598.8 ± 97.8** | LLM critic bypassed; evidence state strictly equals deterministic rule_state. |
+| **Baseline (Full System)** | `(default)` | 5/5 (100.0%) | 5/5 (100.0%) [Blocked] | 5/5 (100.0%) [Recorded] | 5/5 (100.0%) [Enforced] | **1111.7 ± 637.6** | Full multi-layered safeguard pipeline active. |
+| **No Policy Gating** | `--no-gating` | 5/5 (100.0%) | 0/5 (0.0%) [Allowed] | 5/5 (100.0%) [Recorded] | 5/5 (100.0%) [Enforced] | **809.6 ± 67.9** | Policy gate returns ALLOW for all requests; out-of-spec input allowed. |
+| **No Provenance Constraints** | `--no-provenance-constraints` | 5/5 (100.0%) | 5/5 (100.0%) [Blocked] | 5/5 (100.0%) [Recorded] | 0/5 (0.0%) [Skipped] | **2192.0 ± 2338.0** | Report validator bypasses physical file presence and SHA-256 byte checks. |
+| **No SQLite Ledger** | `--no-ledger` | 5/5 (100.0%) | 5/5 (100.0%) [Blocked] | 0/5 (0.0%) [Skipped] | 5/5 (100.0%) [Enforced] | **1145.9 ± 889.9** | Evidence records generated in memory but not persisted to SQLite ledger.db. |
+| **No Critic** | `--no-critic` | 5/5 (100.0%) | 5/5 (100.0%) [Blocked] | 5/5 (100.0%) [Recorded] | 5/5 (100.0%) [Enforced] | **900.3 ± 265.9** | LLM critic bypassed; evidence state strictly equals deterministic rule_state. |
 
 ### Detailed Ablation Analysis:
 
 ### 6.1 Baseline (Full System)
 - **All Safeguards Active:** Executes 100% of required statistical and contract checks (5/5).
-- **Pre-Execution Gating:** Correctly halts out-of-spec requests (`10/10 [100.0%] Blocked`), preventing wasted compute and unauthorized tool execution.
-- **Audit Persistence:** Commits all intermediate claims and checks into SQLite `ledger.db` (`10/10 [100.0%] Recorded`).
-- **Integrity Verification:** Enforces physical file presence and cryptographic SHA-256 byte verification (`10/10 [100.0%] Enforced`).
+- **Pre-Execution Gating:** Correctly halts out-of-spec requests (`5/5 [100.0%] Blocked`), preventing wasted compute and unauthorized tool execution.
+- **Audit Persistence:** Commits all intermediate claims and checks into SQLite `ledger.db` (`5/5 [100.0%] Recorded`).
+- **Integrity Verification:** Enforces physical file presence and cryptographic SHA-256 byte verification (`5/5 [100.0%] Enforced`).
 
 ### 6.2 Ablation: No Policy Gating (`--no-gating`)
-- **Failure Mode:** When gating is disabled (`gating_enabled=False`), the policy gate returns `ALLOW` indiscriminately. Out-of-spec or unapproved queries are permitted to execute tools (`0/10 [0.0%] Blocked, 100% Allowed`), violating the safety envelope and executing compute on unanswerable requests.
+- **Failure Mode:** When gating is disabled (`gating_enabled=False`), the policy gate returns `ALLOW` indiscriminately. Out-of-spec or unapproved queries are permitted to execute tools (`0/5 [0.0%] Blocked, 100% Allowed`), violating the safety envelope and executing compute on unanswerable requests.
 - **Conclusion:** Policy gating provides the critical defense-in-depth boundary against unauthorized tool execution.
 
 ### 6.3 Ablation: No Provenance Constraints (`--no-provenance-constraints`)
@@ -142,7 +142,7 @@ Empirical ablation evaluating the exact contribution of each architectural safeg
 - **Conclusion:** Provenance constraints guarantee report fidelity by strictly binding every quantitative statement to on-disk artifact byte hashes.
 
 ### 6.4 Ablation: No SQLite Ledger (`--no-ledger`)
-- **Failure Mode:** Claims are generated in volatile memory but never persisted to disk (`0/10 [0.0%] Recorded`). External auditors or post-hoc analysis cannot inspect the exact evidence IDs or statistical checks underpinning scientific conclusions.
+- **Failure Mode:** Claims are generated in volatile memory but never persisted to disk (`0/5 [0.0%] Recorded`). External auditors or post-hoc analysis cannot inspect the exact evidence IDs or statistical checks underpinning scientific conclusions.
 - **Conclusion:** SQLite ledger persistence ensures non-volatile reproducibility and forensic auditability.
 
 ### 6.5 Ablation: No Critic (`--no-critic`)

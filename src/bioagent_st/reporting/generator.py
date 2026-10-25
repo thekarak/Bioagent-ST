@@ -87,7 +87,11 @@ def build_report(
     reproducibility = {
         "provenance_count": str(len(provenance)),
         "provenance_manifest_hash": sha256_text(
-            "|".join(sorted(record.artifact_id for record in provenance))
+            "|".join(
+                sorted(
+                    f"{record.output_hash}:{Path(record.output_uri).name}" for record in provenance
+                )
+            )
         ),
     }
     return ScientificReport(

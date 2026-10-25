@@ -7,6 +7,7 @@ from bioagent_st.schemas.base import FrozenRecord
 from bioagent_st.schemas.evidence import EvidenceState
 
 ClaimType = Literal[
+    "qc_pass",
     "cluster_reproducible",
     "marker_specific",
     "spatial_domain_coherent",

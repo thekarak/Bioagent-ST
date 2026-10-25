@@ -11,6 +11,33 @@ REAL_DLPFC_PATH = Path("data/raw/real/dlpfc/151507.h5ad")
 REAL_DLPFC_151673_PATH = Path("data/raw/real/dlpfc/151673.h5ad")
 SYNTHETIC_PATH = Path("data/fixtures/synthetic_spatial_300x500.h5ad")
 
+COMMON_SPATIAL_OBS_PAIRS: list[tuple[str, str]] = [
+    ("x", "y"),
+    ("spatial_x", "spatial_y"),
+    ("array_row", "array_col"),
+    ("imagecol", "imagerow"),
+    ("pxl_col_in_fullres", "pxl_row_in_fullres"),
+]
+
+
+def detect_and_assign_spatial_coordinates(adata: AnnData) -> bool:
+    """
+    If obsm['spatial'] is missing, attempt to auto-detect spatial coordinates from obs columns.
+    Returns True if obsm['spatial'] is present (or successfully created), False otherwise.
+    """
+    if "spatial" in adata.obsm:
+        return True
+    for c1, c2 in COMMON_SPATIAL_OBS_PAIRS:
+        if c1 in adata.obs.columns and c2 in adata.obs.columns:
+            try:
+                coords = adata.obs[[c1, c2]].to_numpy().astype(float)
+                if coords.ndim == 2 and coords.shape[1] >= 2 and coords.shape[0] == adata.n_obs:
+                    adata.obsm["spatial"] = coords
+                    return True
+            except (ValueError, TypeError):
+                continue
+    return False
+
 
 def _detect_counts_like(adata: AnnData) -> bool:
     matrix = adata[: min(100, adata.n_obs), : min(200, adata.n_vars)].X
@@ -33,15 +60,19 @@ def inspect_h5ad(path: str | Path, dataset_id: str | None = None) -> DatasetInsp
     unique_obs = bool(adata.obs_names.is_unique)
     unique_var = bool(adata.var_names.is_unique)
     if not unique_obs:
-        errors.append("observation names are not unique")
+        warnings.append("observation names not unique; will be deduplicated on load")
     if not unique_var:
-        errors.append("gene names are not unique")
+        warnings.append("gene names not unique; will be deduplicated on load")
     if adata.n_obs < 3:
         errors.append("fewer than 3 observations")
     if adata.n_vars < 1:
         errors.append("no genes")
-    if "spatial" not in adata.obsm:
-        errors.append("obsm['spatial'] is required")
+
+    has_spatial = detect_and_assign_spatial_coordinates(adata)
+    if not has_spatial:
+        warnings.append(
+            "obsm['spatial'] missing; required for spatial clustering and spatial autocorrelation"
+        )
 
     finite_coords = False
     if "spatial" in adata.obsm:
@@ -94,7 +125,13 @@ def load_dataset(source: str, user_path: str | Path | None = None) -> AnnData:
         inspection = inspect_h5ad(user_path, dataset_id="user_input")
         if inspection.errors:
             raise ValueError("; ".join(inspection.errors))
-        return read_h5ad(user_path)
+        adata = read_h5ad(user_path)
+        if not adata.obs_names.is_unique:
+            adata.obs_names_make_unique()
+        if not adata.var_names.is_unique:
+            adata.var_names_make_unique()
+        detect_and_assign_spatial_coordinates(adata)
+        return adata
     raise ValueError(f"unsupported dataset source: {source}")
 
 

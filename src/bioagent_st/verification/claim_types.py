@@ -5,6 +5,7 @@ from bioagent_st.schemas.evidence import CheckResult
 
 CheckStatus = Literal["pass", "warn", "fail", "error", "not_applicable"]
 CLAIM_REQUIREMENTS: dict[ClaimType, tuple[str, ...]] = {
+    "qc_pass": ("qc.pass", "data.min_obs", "data.no_nans", "data.duplicate_ids"),
     "cluster_reproducible": ("cluster.stability.ari", "cluster.min_size", "qc.pass"),
     "marker_specific": (
         "marker.effect_size",

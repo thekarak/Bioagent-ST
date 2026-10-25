@@ -23,6 +23,10 @@ class CheckResult(FrozenRecord):
     detail: str = ""
     artifact_ids: list[str] = Field(default_factory=list)
 
+    @property
+    def passed(self) -> bool:
+        return self.status == "pass"
+
 
 class EvidenceRecord(FrozenRecord):
     evidence_id: str
