@@ -97,10 +97,6 @@ def _quality_assessment_evidence(
         art_ids = list(result.artifact_ids)
 
     exp_id = experiment_id
-    if hasattr(artifact, "experiment_id") and artifact.experiment_id:
-        exp_id = str(artifact.experiment_id)
-    elif hasattr(result, "experiment_id") and result.experiment_id:
-        exp_id = str(result.experiment_id)
 
     raw_checks = getattr(result, "checks", None)
     checks_dict: dict[str, Any] = {}

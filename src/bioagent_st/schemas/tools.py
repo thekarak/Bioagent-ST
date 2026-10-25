@@ -6,7 +6,7 @@ from bioagent_st.schemas.base import FrozenRecord
 from bioagent_st.schemas.evidence import CheckResult
 
 
-class CheckCollection(list):
+class CheckCollection(list[CheckResult]):
     """List of CheckResult that supports dictionary lookup by check_id string or integer index."""
 
     def __getitem__(self, item: Any) -> Any:
@@ -92,5 +92,5 @@ class QualityAssessmentResult(ToolResult):
             checks=chk,
             warnings=tr.warnings,
             error=tr.error,
-            passed=p,
+            explicit_passed=p,
         )

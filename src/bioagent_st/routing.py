@@ -692,9 +692,10 @@ class LayaSelector:
             else:
                 raise SelectorError("Laya response is missing an answers object")
         else:
-            answer = answers.get("workflow")
-            if not isinstance(answer, dict):
+            raw_answer = answers.get("workflow")
+            if not isinstance(raw_answer, dict):
                 raise SelectorError("Laya response is missing the workflow answer")
+            answer = raw_answer
 
         label = answer.get("choice") or answer.get("label")
         if label == "unsupported":

@@ -552,7 +552,7 @@ dataset_options = list(datasets_catalog.keys())
 
 
 def dataset_label(k: str) -> str:
-    return datasets_catalog[k]["name"]
+    return str(datasets_catalog[k]["name"])
 
 
 selected_dataset_key = st.sidebar.selectbox(
@@ -610,7 +610,7 @@ with st.sidebar.container(border=True):
 st.sidebar.markdown("---")
 st.sidebar.markdown("### [ROUTING] Workflow Selection")
 
-selector_mode = st.sidebar.radio(
+selector_mode: SelectorKind = st.sidebar.radio(
     "Selector Strategy",
     options=["manual", "rules", "laya"],
     format_func=lambda x: {
@@ -645,12 +645,13 @@ if selector_mode == "manual":
             "spatial autocorrelation of target markers."
         ),
     }
+    active_wf_choice: WorkflowId = target_workflow_choice or "quality_assessment"
     question_input = st.sidebar.text_area(
         "Analysis Research Question",
-        value=default_questions[target_workflow_choice],
+        value=default_questions[active_wf_choice],
         height=70,
     )
-    predicted_workflow = target_workflow_choice
+    predicted_workflow = active_wf_choice
 else:
     sample_queries = {
         "rules": "Filter low count spots and assess data quality.",
@@ -841,7 +842,7 @@ st.markdown(
 if btn_preview:
     try:
         preview_dec, preview_gate = evaluate_gate_preview(
-            selector_kind=selector_mode,  # type: ignore[arg-type]
+            selector_kind=selector_mode,
             question=question_input,
             target_workflow=target_workflow_choice,
         )
@@ -942,7 +943,7 @@ if btn_run:
                     dataset_key=selected_dataset_key,
                     custom_file_path=custom_uploaded_path,
                     question=question_input,
-                    selector_kind=selector_mode,  # type: ignore[arg-type]
+                    selector_kind=selector_mode,
                     target_workflow=target_workflow_choice,
                     parameters=all_configured_parameters,
                 )
