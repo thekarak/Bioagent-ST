@@ -1,6 +1,6 @@
 # BioAgent-ST: Verification-First Scientific Agent for Spatial Transcriptomics
 
-> **Release `v1.0-paper`** • Built with Python 3.11 (`uv`), Scanpy, Squidpy, FastAPI, Next.js 16, and SQLite.  
+> **Release `v1.0-paper`** • Built with Python 3.11 (`uv`), Scanpy, Squidpy, Streamlit, FastAPI, Next.js 16, and SQLite.  
 > **Scientific Guarantee:** Every scientific calculation is deterministic. The LLM never invents numbers. Every claim is evidence-bound. Every artifact is cryptographically hashed.
 
 ---
@@ -32,6 +32,7 @@ Instead of trusting an LLM to perform data analysis, we enforce a strict separat
 3. **Dual-loop verifier-critic:** An outer Planner–Executor engine coordinates analysis, while an inner Verifier–Critic loop evaluates every intermediate artifact against formal mathematical contracts. Claims are governed by a deterministic five-state rule engine; an LLM critic may only **downgrade** confidence, never upgrade it.
 4. **Content-addressed provenance ledger:** Every generated table, plot, and AnnData object is indexed with a SHA-256 byte hash, timestamp, library versions, parameter dictionary, and git commit in an immutable SQLite database (`ledger.db`).
 5. **Fail-closed policy gating:** Requests with low evidence, unsupported questions (e.g. clinical survival or automated cell-typing), or adversarial prompt injections are stopped at the policy gate before executing tools.
+6. **Publication-grade validated scientific reporting:** Reports cannot invent statistics. Quantitative statements are extracted directly from verified physical artifacts, bound to recorded artifact IDs, and checked on disk before final report sign-off.
 
 ---
 
@@ -45,7 +46,7 @@ Instead of trusting an LLM to perform data analysis, we enforce a strict separat
                                            ▼
                     ┌──────────────────────────────────────────────┐
                     │      Deterministic Workflow Selector         │
-                    │   (Rule Engine / Laya Fine-Tuned Router)     │
+                    │   (Rule Engine / Calibrated Laya Router)     │
                     └──────────────────────┬───────────────────────┘
                                            │
                         ┌──────────────────┴──────────────────┐
@@ -98,9 +99,29 @@ We deliberately constrain BioAgent-ST to three core, contract-governed spatial t
 
 | Workflow ID | Purpose | Generated Artifacts | Integrity Checks Enforced |
 |---|---|---|---|
-| **`quality_assessment`** | Checks dataset dimensions, sequencing depth, and mitochondrial percentage without altering raw counts. | `qc.h5ad`, `qc_table.csv`, `schema_report.json`, `manifest.json` | Matrix dimensionality, non-negative counts, valid coordinate arrays, unique cell/spot IDs, zero NaNs. |
+| **`quality_assessment`** | Checks dataset dimensions, sequencing depth, and mitochondrial percentage without altering raw counts. | `qc.h5ad`, `qc_table.csv`, `schema_report.json`, `manifest.json` | Matrix dimensionality, non-negative counts, valid coordinate arrays, unique cell/spot IDs, zero NaNs, `qc.pass` verification. |
 | **`spatial_clustering`** | Matrix-aware normalization, PCA, spatial neighborhood graph, Leiden graph partitioning, UMAP, and spot visualization. | `clustered.h5ad`, `cluster_table.csv`, `umap_coords.csv`, `spatial_clusters.png`, `manifest.json` | Graph continuity, isolate spot fractions, minimum cluster size ($\ge 10$ spots), ARI stability ($\ge 0.60$). |
 | **`gene_expression`** | Exact gene query resolution, expression distribution summary, spatial feature plotting, and Moran's $I$ spatial autocorrelation. | `gene_match_report.csv`, `expression_summary.csv`, `expression_values.csv`, `spatial_expression.png`, `spatial_autocorr.csv` | Exact gene symbol resolution (no silent substitutions), layer validation (`counts` vs `X`), Moran's $I$ $p_{\text{adj}} < 0.05$. |
+
+---
+
+## Validated Scientific Report & Evidence Discipline
+
+A core innovation in BioAgent-ST is our **fail-closed report generator and validator** (`src/bioagent_st/reporting/generator.py`):
+
+1. **Extraction of Quantitative Measurements:**  
+   Every numeric claim presented in the final report—spot counts, gene counts, cluster distributions, and Moran's $I$ statistics—is extracted programmatically from deterministic physical artifacts (`qc_table.csv`, `cluster_table.csv`, `spatial_autocorr.csv`, etc.).
+2. **Cryptographic Grounding:**  
+   Every quantitative statement and finding is assigned an explicit, verified `artifact_id`. `validate_report()` inspects each referenced file on disk and verifies that its computed SHA-256 byte digest matches the immutable SQLite ledger record. If any file is missing, altered, or unrecorded, report validation **fails immediately with `ReportValidationError`**.
+3. **Five-State Evidence Discipline:**  
+   Scientific findings are rigorously segregated into five states:
+   - `[SUPPORTED]`: Confirmed by passing all hard mathematical contract checks.
+   - `[PLAUSIBLE]`: Passes baseline checks but carries explicit operational caveats.
+   - `[HYPOTHESIS]`: Exploratory claim requiring orthogonal experimental confirmation.
+   - `[UNSUPPORTED]`: Failed one or more required contract checks.
+   - `[INDETERMINATE]`: Cannot be evaluated due to missing prerequisite measurements.
+4. **Reproducibility Appendix:**  
+   Every report concludes with an immutable audit block listing the provenance manifest SHA-256 hash, SQLite ledger path, tool version strings, and the exact git commit of the executing code.
 
 ---
 
@@ -113,12 +134,12 @@ We curated and froze a standardized 75-query benchmark spanning Quality Assessme
 
 | Metric | Deterministic Rules | Laya Router (LLM) | Denominator / Note |
 |---|:---:|:---:|---|
-| **Overall Accuracy** | **96.0% (72/75)** | **94.7% (71/75)** | Exact match against expert gold standard |
-| **Macro F1 Score** | **0.963** | **0.950** | Mean unweighted F1 over all 4 classes |
-| **Abstention Precision** | **96.5% (28/29)** | **100.0% (26/26)** | Correctness when refusing to execute |
+| **Overall Accuracy** | **97.3% (73/75)** | **94.7% (71/75)** | Exact match against expert gold standard |
+| **Macro F1 Score** | **0.975** | **0.950** | Mean unweighted F1 over all 4 classes |
+| **Abstention Precision** | **100.0% (28/28)** | **100.0% (26/26)** | Correctness when refusing to execute |
 | **Abstention Recall** | **93.3% (28/30)** | **86.7% (26/30)** | Sensitivity to out-of-scope requests |
 | **Unauthorized Execution Rate** | **6.7% (2/30)** | **13.3% (4/30)** | Unsafe execution on unanswerable requests (lower is safer) |
-| **Mean Latency** | **0.17 ms** | **12.65 ms** | Sub-millisecond rule routing vs. LLM forward pass |
+| **Mean Latency** | **0.14 ms** | **12.62 ms** | Sub-millisecond rule routing vs. calibrated model inference |
 
 ### 2. Dual-Annotator Consensus Validation
 To guarantee our ground truth was not biased by our own assumptions, we selected a representative 25-query subset and had it independently annotated by two experts:
@@ -185,9 +206,11 @@ BioAgent-ST/
 │   ├── novelty_map.md             # Explicit architectural contributions & non-claims
 │   ├── literature_matrix.md       # Comparative analysis vs. Scanpy, Squidpy, SpatialAgent, STAT
 │   └── PROGRESS.md                # Reverse-chronological engineering and audit log
-├── frontend/                      # Next.js 16 + React 19 + Tailwind CSS web dashboard
 ├── apps/
+│   ├── ui/                        # High-contrast, theme-resilient Streamlit application
+│   │   └── app.py                 # 500 MB upload support, visualizers, and Tab 4 report viewer
 │   └── api/                       # FastAPI REST service connecting frontend to Python engine
+├── frontend/                      # Next.js 16 + React 19 + Tailwind CSS web dashboard
 ├── src/
 │   └── bioagent_st/
 │       ├── analysis/              # Scanpy & Squidpy deterministic workflows
@@ -196,13 +219,14 @@ BioAgent-ST/
 │       ├── ledger/                # SQLite provenance and evidence stores
 │       ├── agents/                # Planner, sequential executor, and verifier loop
 │       ├── reporting/             # Fail-closed report generator and byte validator
-│       └── routing.py             # Deterministic keyword selector & Laya adapter
+│       └── routing.py             # Deterministic keyword selector & calibrated Laya adapter
 ├── tests/
-│   ├── unit/                      # 154 unit tests covering checks, gates, routing, and ablations
+│   ├── unit/                      # Unit tests covering checks, gates, routing, UI, and reporting
 │   └── integration/               # End-to-end workflow execution tests
 └── scripts/
     ├── evaluate_routing.py        # Rules vs Laya routing benchmark runner
-    └── run_paper_evaluations.py   # Publication evaluation and ablation benchmark suite
+    ├── run_paper_evaluations.py   # Publication evaluation and ablation benchmark suite
+    └── verify_reproducibility.py  # Bitwise multi-run reproducibility verification
 ```
 
 ---
@@ -226,10 +250,10 @@ uv sync --locked --all-groups
 ```
 
 ### 3. Run Quality & Verification Checks
-Verify that all 154 unit tests pass, static types are strictly checked, and formatting is clean:
+Verify that all unit tests pass, static types are strictly checked, and formatting is clean:
 
 ```bash
-# Run full unit test suite (154 tests)
+# Run full unit test suite
 uv run pytest tests/unit -q
 
 # Run Ruff linter and format checker
@@ -248,7 +272,21 @@ uv run python scripts/run_paper_evaluations.py --runs 3
 ```
 This generates the full publication markdown report in `docs/paper_evaluation_results.md`.
 
-### 5. Inspect Datasets & Execute Workflows via CLI
+### 5. Launch the Streamlit Interactive Interface
+BioAgent-ST includes a high-contrast, theme-resilient Streamlit application featuring chunked streaming for uploads up to 500 MB, coordinate auto-detection for user `.h5ad` files, live spatial scatter plots, and the publication-grade Validated Scientific Report viewer:
+
+```bash
+uv run streamlit run apps/ui/app.py --server.port 8501
+```
+Open [http://localhost:8501](http://localhost:8501) in your browser.
+
+- **Tab 1 — Overview & Ingest:** Dataset metadata inspection, spatial coordinate validation, and 500 MB file upload.
+- **Tab 2 — Evidence Ledger:** Five-state evidence records with underlying contract checks.
+- **Tab 3 — Provenance & Artifacts:** Cryptographic SHA-256 byte hashes and on-disk file locations.
+- **Tab 4 — Validated Scientific Report:** Interactive report viewer, quantitative measurement tables, and Markdown/JSON ledger downloads.
+- **Tab 5 — Run History & Audit:** Persistent audit log across historical executions.
+
+### 6. Inspect Datasets & Execute Workflows via CLI
 You can inspect our included synthetic spatial fixture or real CC BY 4.0 10x Visium DLPFC datasets (`151507` and `151673`):
 
 ```bash
@@ -265,14 +303,14 @@ uv run bioagent-st run-workflow spatial_clustering --source synthetic --output a
 uv run bioagent-st run-workflow gene_expression --source synthetic --genes GENE_0000 --output artifacts/expr_run
 ```
 
-### 6. Run the Sequential Agent
+### 7. Run the Sequential Agent
 Run the end-to-end autonomous agent with typed planning, execution, verification, SQLite ledger persistence, and validated reporting:
 
 ```bash
 uv run bioagent-st run-agent --source synthetic --question "Assess dataset quality and report mitochondrial counts" --output artifacts/agent_qc
 ```
 
-### 7. Launch the REST API & Web Dashboard
+### 8. Launch the REST API & Web Dashboard
 To explore the interactive 3D tissue visualization, live policy gate inspection, and run ledger:
 
 ```bash
@@ -281,8 +319,8 @@ uv run uvicorn apps.api.main:app --reload --port 8000
 
 # Terminal 2: Start Next.js frontend (port 3000)
 cd frontend
-npm install # or bun install
-npm run dev
+bun install  # or npm install
+bun run dev  # or npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
@@ -300,3 +338,4 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 We took help of several LLMs and several agent harnesses while designing, developing, evaluating, and auditing this system.
 
 <sub>developed by Sourasis Karak and Sourav Sarkar</sub>
+
