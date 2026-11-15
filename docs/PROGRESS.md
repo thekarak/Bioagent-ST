@@ -2,6 +2,28 @@
 
 Format: newest session first. Each entry: date, phase/task, done, next, open questions, known failures.
 
+## 2026-10-26 — Validated Scientific Report Generator Overhaul & UI Interactive Viewer
+
+- **Phase/Task:** Publication-grade validated scientific report generation and interactive viewer:
+  1. Automated extraction of cryptographically verified `QuantitativeStatement`s in `build_report()`.
+  2. Publication-grade markdown report generation with tabular summaries in `write_report()`.
+  3. Interactive Tab 4 dashboard in `apps/ui/app.py` with multi-section inspectors and dual export.
+  4. Unit test suite coverage and strict validation enforcement.
+- **Done:**
+  - **Quantitative Statements Extraction:**
+    - Implemented `_extract_quantitative_statements()` in `src/bioagent_st/reporting/generator.py` extracting spot counts, gene counts, cluster distributions, and spatial autocorrelation metrics (Moran's I) directly from verified on-disk artifacts.
+    - Bound all numeric statements to existing provenance records, guaranteeing zero hash mismatch or missing artifact validation errors in `validate_report()`.
+  - **Comprehensive Markdown Generation:**
+    - Formatted publication report markdown with Executive Summary, Workflow Trace table, Findings categorized by Five-State Discipline, Verified Measurements table, Scientific Limitations, and Cryptographic Manifest Appendix.
+  - **Streamlit Tab 4 Overhaul:**
+    - Enhanced Tab 4 with Integrity Gate cards (`[PASS]`), Executive Metrics, publication markdown viewer, and 5 interactive deep-dive inspectors.
+    - Added download options for Markdown report and JSON execution ledger.
+  - **Verification:**
+    - 32 unit tests passing; Ruff lint and format check 100% clean; Mypy clean.
+- **Next:** Push changes to remote repository.
+- **Open questions:** None.
+- **Known failures:** Third-party AnnData/Squidpy deprecation warnings remain; zero test or build failures.
+
 ## 2026-10-26 — Streamlit UI Overhaul, Offline Laya Predictor, and Manual Dataset Ingest Resilience
 
 - **Phase/Task:** Interactive verification UI, offline router stability, and real-world AnnData ingest resilience:
