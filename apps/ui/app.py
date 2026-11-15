@@ -516,6 +516,13 @@ def execute_pipeline(
         "report_markdown": (run_dir / "report.md").read_text(encoding="utf-8")
         if (run_dir / "report.md").is_file()
         else "",
+        "report_findings": [f.model_dump(mode="json") for f in report.findings],
+        "report_quantitative_statements": [
+            q.model_dump(mode="json") for q in report.quantitative_statements
+        ],
+        "report_workflow": [w.model_dump(mode="json") for w in report.workflow],
+        "report_limitations": report.limitations,
+        "report_reproducibility": report.reproducibility,
     }
 
     # Save run record to disk for persistence
@@ -1257,23 +1264,135 @@ if active_record is not None:
         val_badge_txt = "[PASS]" if v_status == "passed" else "[FAIL]"
 
         with st.container(border=True):
-            st.markdown("#### [REPORT INTEGRITY] Validation Status")
-            st.markdown(
-                f'<span class="status-badge {val_badge_cls}">{val_badge_txt}</span> '
-                f"<strong>Result:</strong> {v_detail}",
-                unsafe_allow_html=True,
-            )
+            col_v1, col_v2 = st.columns([1, 3])
+            with col_v1:
+                st.markdown("#### [INTEGRITY GATE]")
+                st.markdown(
+                    f'<span class="status-badge {val_badge_cls}">{val_badge_txt}</span>',
+                    unsafe_allow_html=True,
+                )
+            with col_v2:
+                st.markdown("#### [VERIFICATION CONTRACT]")
+                st.markdown(f"**Result:** `{v_detail}`")
+                run_id_val = active_record.get("run_id", "N/A")
+                ts_val = active_record.get("timestamp", "N/A")
+                st.caption(f"Run ID: {run_id_val} | Generated: {ts_val}")
+
+        # Executive Metrics Cards
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        with col_m1:
+            st.metric("Target Dataset", active_record.get("dataset_id", "fixture"))
+        with col_m2:
+            st.metric("Active Workflow", active_record.get("workflow", "N/A"))
+        with col_m3:
+            policy_decision = active_record.get("policy", {}).get("decision", "ALLOW")
+            st.metric("Policy Gate", f"[{policy_decision}]")
+        with col_m4:
+            art_count = len(active_record.get("artifacts", []))
+            st.metric("Verified Artifacts", f"{art_count} files")
 
         report_md = active_record.get("report_markdown", "")
         if report_md:
             with st.container(border=True):
+                st.markdown("#### [PUBLICATION REPORT] Formatted Markdown Document")
                 st.markdown(report_md)
-            st.download_button(
-                label="[DOWNLOAD] Scientific Report (Markdown)",
-                data=report_md,
-                file_name=f"bioagent_st_report_{active_record.get('run_id')}.md",
-                mime="text/markdown",
-            )
+
+            # Interactive Deep-Dive Sections
+            st.markdown("#### [INSPECT] Structured Scientific Ledger Breakdown")
+
+            # 1. Findings Inspector
+            findings_data = active_record.get("report_findings", [])
+            with st.expander(
+                "[FINDINGS] Grounded Findings by Five-State Discipline", expanded=True
+            ):
+                if findings_data:
+                    findings_rows = []
+                    for f in findings_data:
+                        sec = f.get("section", "indeterminate").upper()
+                        findings_rows.append(
+                            {
+                                "State": f"[{sec}]",
+                                "Scientific Finding Claim": f.get("text", ""),
+                                "Evidence ID": f.get("evidence_id", ""),
+                                "Claim ID": f.get("claim_id", ""),
+                            }
+                        )
+                    st.dataframe(pd.DataFrame(findings_rows), use_container_width=True)
+                else:
+                    st.info("[INFO] No finding claims recorded for this run.")
+
+            # 2. Quantitative Measurements Inspector
+            quant_data = active_record.get("report_quantitative_statements", [])
+            with st.expander(
+                "[QUANTITATIVE] Verified Measurements and Statistical Statements", expanded=True
+            ):
+                if quant_data:
+                    quant_rows = []
+                    for q in quant_data:
+                        quant_rows.append(
+                            {
+                                "Measured Finding / Statement": q.get("text", ""),
+                                "Linked Artifact ID": q.get("artifact_id", ""),
+                            }
+                        )
+                    st.dataframe(pd.DataFrame(quant_rows), use_container_width=True)
+                else:
+                    st.info("[INFO] No quantitative statements attached to this run.")
+
+            # 3. Methodology & Workflow Inspector
+            workflow_data = active_record.get("report_workflow", [])
+            with st.expander("[METHODOLOGY] Analysis Workflow Execution Trace"):
+                if workflow_data:
+                    wf_rows = []
+                    for w in workflow_data:
+                        wf_rows.append(
+                            {
+                                "Step ID": w.get("step_id", ""),
+                                "Tool Name": w.get("tool_name", ""),
+                                "Output Artifacts": ", ".join(w.get("artifact_ids", [])),
+                            }
+                        )
+                    st.dataframe(pd.DataFrame(wf_rows), use_container_width=True)
+                else:
+                    st.info("[INFO] No workflow steps recorded.")
+
+            # 4. Caveats & Limitations Inspector
+            limitations_data = active_record.get("report_limitations", [])
+            with st.expander("[CAVEATS] Scientific Limitations & Boundary Conditions"):
+                if limitations_data:
+                    for item in limitations_data:
+                        st.markdown(f"- {item}")
+                else:
+                    st.info("[INFO] No specific limitations logged.")
+
+            # 5. Reproducibility & Cryptographic Manifest Inspector
+            repro_data = active_record.get("report_reproducibility", {})
+            with st.expander("[REPRODUCIBILITY] Cryptographic Ledger Manifest & Audit"):
+                if repro_data:
+                    st.json(repro_data)
+                else:
+                    st.info("[INFO] Reproducibility data not available.")
+
+            # Export actions
+            st.markdown("#### [EXPORT] Download Verified Artifacts")
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                st.download_button(
+                    label="[DOWNLOAD] Scientific Report (Markdown)",
+                    data=report_md,
+                    file_name=f"bioagent_st_report_{active_record.get('run_id')}.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+            with col_d2:
+                json_data = json.dumps(active_record, indent=2)
+                st.download_button(
+                    label="[DOWNLOAD] Full Structured Run Ledger (JSON)",
+                    data=json_data,
+                    file_name=f"bioagent_st_ledger_{active_record.get('run_id')}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
         else:
             st.info("[INFO] Report file is empty or not yet generated.")
 

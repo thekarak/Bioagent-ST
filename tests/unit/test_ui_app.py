@@ -158,3 +158,25 @@ def test_ui_execute_pipeline_parameter_mismatch_resilience() -> None:
     assert rec_qc["parameters"]["min_genes"] == 100
     assert rec_qc["parameters"]["min_counts"] == 0
     assert rec_qc["validation_status"] == "passed"
+
+
+def test_ui_execute_pipeline_populates_validated_scientific_report() -> None:
+    rec = execute_pipeline(
+        dataset_key="synthetic",
+        custom_file_path=None,
+        question="Assess dataset quality and examine spot statistics.",
+        selector_kind="manual",
+        target_workflow="quality_assessment",
+        parameters={},
+    )
+    assert rec["validation_status"] == "passed"
+    assert "report_markdown" in rec
+    assert "# BioAgent-ST Validated Scientific Report" in rec["report_markdown"]
+    assert "report_quantitative_statements" in rec
+    assert len(rec["report_quantitative_statements"]) > 0
+    assert "report_findings" in rec
+    assert "report_workflow" in rec
+    assert len(rec["report_workflow"]) > 0
+    assert "report_limitations" in rec
+    assert "report_reproducibility" in rec
+    assert "provenance_manifest_hash" in rec["report_reproducibility"]
