@@ -139,7 +139,7 @@ We curated and froze a standardized 75-query benchmark spanning Quality Assessme
 | **Abstention Precision** | **100.0% (28/28)** | **100.0% (26/26)** | Correctness when refusing to execute |
 | **Abstention Recall** | **93.3% (28/30)** | **86.7% (26/30)** | Sensitivity to out-of-scope requests |
 | **Unauthorized Execution Rate** | **6.7% (2/30)** | **13.3% (4/30)** | Unsafe execution on unanswerable requests (lower is safer) |
-| **Mean Latency** | **0.14 ms** | **12.62 ms** | Sub-millisecond rule routing vs. calibrated model inference |
+| **Routing Latency (Mean / Median)** | **0.19 ms / 0.14 ms** | **12.69 ms / 12.66 ms** | Sub-millisecond rule routing vs. calibrated model inference |
 
 ### 2. Dual-Annotator Consensus Validation
 To guarantee our ground truth was not biased by our own assumptions, we selected a representative 25-query subset and had it independently annotated by two experts:
@@ -253,8 +253,11 @@ uv sync --locked --all-groups
 Verify that all unit tests pass, static types are strictly checked, and formatting is clean:
 
 ```bash
-# Run full unit test suite
+# Run full unit test suite (188 tests)
 uv run pytest tests/unit -q
+
+# Or run complete test suite including end-to-end integration (204 tests)
+uv run pytest -q
 
 # Run Ruff linter and format checker
 uv run ruff check src apps tests scripts docs
@@ -280,11 +283,12 @@ uv run streamlit run apps/ui/app.py --server.port 8501
 ```
 Open [http://localhost:8501](http://localhost:8501) in your browser.
 
-- **Tab 1 — Overview & Ingest:** Dataset metadata inspection, spatial coordinate validation, and 500 MB file upload.
-- **Tab 2 — Evidence Ledger:** Five-state evidence records with underlying contract checks.
-- **Tab 3 — Provenance & Artifacts:** Cryptographic SHA-256 byte hashes and on-disk file locations.
-- **Tab 4 — Validated Scientific Report:** Interactive report viewer, quantitative measurement tables, and Markdown/JSON ledger downloads.
-- **Tab 5 — Run History & Audit:** Persistent audit log across historical executions.
+- **Sidebar & Ingest:** Dataset source selection (Synthetic fixture, 10x Visium DLPFC samples, or User Upload with streaming up to 500 MB), spatial coordinate validation, and policy gate preview.
+- **Tab 1 — Visualizations and Tables:** Interactive spatial scatter plots, QC distribution metrics, Leiden cluster breakdown, and Moran's $I$ spatial autocorrelation tables.
+- **Tab 2 — Evidence Ledger (5-State):** Five-state evidence records (`supported`, `plausible`, `hypothesis`, `unsupported`, `indeterminate`) mapped to underlying mathematical contract checks.
+- **Tab 3 — Provenance and Artifacts:** Cryptographic SHA-256 byte hashes, tool parameter records, random seeds, and on-disk file locations.
+- **Tab 4 — Validated Scientific Report:** Interactive validated report preview, quantitative measurement tables grounded in verified artifact IDs, and Markdown / JSON ledger downloads.
+- **Tab 5 — Run History and Verification:** Persistent audit log across historical executions and ledger databases.
 
 ### 6. Inspect Datasets & Execute Workflows via CLI
 You can inspect our included synthetic spatial fixture or real CC BY 4.0 10x Visium DLPFC datasets (`151507` and `151673`):
